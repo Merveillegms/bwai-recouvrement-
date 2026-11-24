@@ -99,15 +99,16 @@
 
 **Sortie** : ordre identique au calcul manuel ; chaque rang a son explication. ✅ Jeu de 5 factures calculé à la main reproduit exactement ; propriétés (score borné, monotone) ; aucune facture oubliée ni comptée deux fois sur le jeu de démo ; 173 tests, couverture 93 %.
 
-### Phase 4 · Relances
-- [ ] Séquence réglable : R0 (−3 j) · R1 (+1-3 j) · R2 (+10-15 j) · R3 (+30 j, humain) · R4 (+45-60 j, humain) · R5 (+90 j, escalade)
-- [ ] Délai minimal entre deux relances ; une relance max par client et par jour (factures regroupées)
-- [ ] Gabarits par étape et canal (SMS, WhatsApp, e-mail) ; variables insérées par le code
-- [ ] Référence de paiement unique avec clé de contrôle ; fiche de paiement PDF
-- [ ] Connecteur bac à sable (table `messages_sortants`) derrière une interface d'envoi unique
-- [ ] Saisie des réponses : promesse (suspend jusqu'à la date), paiement annoncé, litige, injoignable
+### Phase 4 · Relances ✅ (24/11)
+- [x] Séquence réglable : R0 (−3 j, option) · R1 (+1 j) · R2 (+10 j) · R3 (+30 j, humain) · R4 (+45 j, humain) · R5 (+90 j, escalade)
+- [x] Délai minimal entre deux relances (date métier) ; un seul message par client et par jour (lot d'envoi, multi-devises)
+- [x] Gabarits par étape et canal (SMS, WhatsApp, e-mail), vouvoiement + touche béninoise, singulier/pluriel, lots à étapes mixtes exacts ; contrôle de ton et de longueur
+- [x] Référence de paiement avec clé de contrôle ; fiche de paiement PDF (fpdf2)
+- [x] Connecteur bac à sable (dossier `data/sortants/` + table `messages_sortants`), dédupliqué par clé d'envoi, derrière une interface unique
+- [x] Saisie des réponses : promesse / délai (suspend jusqu'à la date), paiement annoncé, litige, injoignable
+- [x] Escalade R5 : dossier interne, jamais de message client ; arrêt d'urgence et plage horaire respectés
 
-**Sortie** : chaque facture éligible génère le bon message, à la bonne étape, une seule fois.
+**Sortie** : chaque facture éligible génère le bon message, à la bonne étape, une seule fois. ✅ Vérifié sur tout le jeu de démo (une relance par facture éligible, étape exacte, valeurs du message identiques aux données calculées, idempotent) ; 233 tests, couverture 93 %.
 
 ### Phase 5 · Garde-fous
 - [ ] Revalidation juste avant envoi (version de la facture) ; annulation journalisée si l'état a changé

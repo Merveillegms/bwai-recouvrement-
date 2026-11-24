@@ -15,7 +15,7 @@ from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
 from app import etat as moteur
-from app import importer, parametres, priorisation, rapprochement, resolution, statuts
+from app import fiche, importer, parametres, priorisation, rapprochement, relances, reponses, resolution, statuts
 from app.db import connecter, version_schema
 from app.erreurs import ErreurMetier
 from app.montants import depuis_unites_mineures
@@ -44,7 +44,7 @@ def _import_refuse(_: Request, e: importer.ImportRefuse) -> JSONResponse:
 
 _STATUTS_ERREURS = {"INTROUVABLE": 404, "DEJA_RESOLUE": 409, "DEJA_CLOTUREE": 409, "FACTURE_ENGAGEE": 409,
                     "CLIENT_EN_ATTENTE": 409, "TRANSITION_INTERDITE": 409, "DECISION_HUMAINE_REQUISE": 409,
-                    "NON_APPLICABLE": 409}
+                    "NON_APPLICABLE": 409, "ARRET_URGENCE": 423, "HORS_PLAGE_HORAIRE": 409}
 
 
 @app.exception_handler(ErreurMetier)
@@ -423,3 +423,61 @@ def modifier_poids(corps: Poids, conn: sqlite3.Connection = Depends(base), u: di
         raise ErreurApi(422, "POIDS_INVALIDES", "Les poids doivent être des nombres positifs de somme 1") from None
     parametres.ecrire(conn, "poids_priorite", {k: float(v) for k, v in corps.model_dump().items()}, u["identifiant"])
     return {"statut": "ok"}
+
+
+# ------------------------------------------------------------------------ relances
+@app.post("/api/relances/preparer")
+def preparer_relances(conn: sqlite3.Connection = Depends(base), u: dict = Depends(utilisateur)) -> dict:
+    _ecriture_autorisee(u)
+    return relances.preparer(conn)
+
+
+@app.get("/api/relances/lots")
+def lots_de_relances(statut: str | None = None, conn: sqlite3.Connection = Depends(base),
+                     u: dict = Depends(utilisateur)) -> list[dict]:
+    """Un lot = un message (ou un dossier d'escalade) pour un client : aperçu avant validation."""
+    lots: dict[str, dict] = {}
+    for r in conn.execute("SELECT r.*, c.code AS code_client, c.nom AS nom_client, f.numero FROM relances r"
+                          " JOIN clients c ON c.id = r.client_id JOIN factures f ON f.id = r.facture_id"
+                          " ORDER BY r.id"):
+        lot = lots.setdefault(r["lot_envoi"], {
+            "lot": r["lot_envoi"], "client": {"id": r["client_id"], "code": r["code_client"], "nom": r["nom_client"]},
+            "canal": r["canal"], "statut": r["statut"], "message": r["message"],
+            "motif_validation": r["motif_validation"], "date_preparation": r["date_preparation"], "relances": []})
+        lot["relances"].append({"id": r["id"], "facture_id": r["facture_id"], "numero": r["numero"],
+                                "etape": r["etape"], "statut": r["statut"]})
+    return [l for l in lots.values() if not statut or l["statut"] == statut]
+
+
+@app.post("/api/relances/envoyer")
+def envoyer_relances(conn: sqlite3.Connection = Depends(base), u: dict = Depends(utilisateur)) -> dict:
+    _ecriture_autorisee(u)
+    return relances.envoyer(conn, u["identifiant"])
+
+
+@app.get("/api/messages")
+def messages_sortants(conn: sqlite3.Connection = Depends(base), u: dict = Depends(utilisateur)) -> list[dict]:
+    return [dict(m) for m in conn.execute("SELECT * FROM messages_sortants ORDER BY id DESC")]
+
+
+@app.get("/api/factures/{facture_id}/fiche-paiement.pdf")
+def fiche_paiement(facture_id: int, conn: sqlite3.Connection = Depends(base), u: dict = Depends(utilisateur)) -> Response:
+    contenu = fiche.generer_fiche(conn, facture_id)
+    return Response(contenu, media_type="application/pdf",
+                    headers={"Content-Disposition": f'inline; filename="fiche_paiement_{facture_id}.pdf"'})
+
+
+class ReponseClient(BaseModel):
+    type: str
+    facture_id: int | None = None
+    date_promise: str | None = None
+    texte: str | None = None
+
+
+@app.post("/api/clients/{client_id}/reponses", status_code=201)
+def enregistrer_reponse(client_id: int, corps: ReponseClient, conn: sqlite3.Connection = Depends(base),
+                        u: dict = Depends(utilisateur)) -> dict:
+    _ecriture_autorisee(u)
+    rid = reponses.enregistrer(conn, client_id, corps.type, u["identifiant"], facture_id=corps.facture_id,
+                               date_promise=corps.date_promise, texte=corps.texte)
+    return {"id": rid}

@@ -129,3 +129,37 @@ def test_file_aujourdhui_et_explications(client):
     assert client.put("/api/parametres/poids_priorite", json=nouveaux,
                       headers={"X-Utilisateur": "validateur"}).status_code == 200
     assert client.get("/api/aujourdhui").json()["file"][0]["poids"]["solde"] == "0.4"
+
+
+def test_parcours_relances(client, tmp_path):
+    from app import parametres
+    from app.db import connecter
+    import os
+    conn = connecter(os.environ["RECOUVREMENT_DB"])
+    parametres.ecrire(conn, "controle_heures_envoi", False, "test")  # le test ne dépend pas de l'heure réelle
+    conn.close()
+    for type_, nom in [("clients", "clients.csv"), ("factures", "factures_lot1.csv"),
+                       ("paiements", "paiements_mobile_money.csv")]:
+        assert _envoyer(client, type_, nom).status_code == 201
+    assert client.post("/api/relances/preparer", headers={"X-Utilisateur": "auditeur"}).status_code == 403
+    resume = client.post("/api/relances/preparer").json()
+    assert resume["relances"] > 0 and resume["lots"] > 0
+    lots = client.get("/api/relances/lots").json()
+    assert len(lots) == resume["lots"] and all(l["message"] and l["relances"] for l in lots)
+    a_valider = client.get("/api/relances/lots?statut=a_valider").json()
+    assert a_valider and all(l["motif_validation"] for l in a_valider)
+
+    envoi = client.post("/api/relances/envoyer").json()
+    assert envoi["envoyes"] == len([l for l in lots if l["statut"] == "validee"])
+    messages = client.get("/api/messages").json()
+    assert len(messages) == envoi["envoyes"] and all(m["accuse"].startswith("SBX-") for m in messages)
+
+    facture = lots[0]["relances"][0]["facture_id"]
+    pdf = client.get(f"/api/factures/{facture}/fiche-paiement.pdf")
+    assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF")
+
+    client_id = lots[0]["client"]["id"]
+    r = client.post(f"/api/clients/{client_id}/reponses", json={"type": "promesse", "date_promise": "2026-12-20"})
+    assert r.status_code == 201
+    r = client.post(f"/api/clients/{client_id}/reponses", json={"type": "promesse"})
+    assert r.status_code == 422 and r.json()["code"] == "DATE_OBLIGATOIRE"

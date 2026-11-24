@@ -8,6 +8,12 @@ from app.db import connecter, migrer
 DATE_DEMO = "2026-12-15"
 
 
+@pytest.fixture(autouse=True)
+def sortants_temporaires(tmp_path, monkeypatch):
+    """Les messages « envoyés » par le bac à sable vont dans un dossier temporaire, jamais dans le dépôt."""
+    monkeypatch.setenv("RECOUVREMENT_SORTANTS", str(tmp_path / "sortants"))
+
+
 @pytest.fixture
 def conn(tmp_path):
     """Base SQLite neuve et migrée, isolée pour chaque test."""

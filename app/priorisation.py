@@ -83,10 +83,12 @@ def historiques(conn: sqlite3.Connection, ctx: moteur.Contexte,
         "SELECT facture_id, max(date_paiement) AS d FROM paiements"
         " WHERE statut_rapprochement = 'rapproche' GROUP BY facture_id")}
     relances = {r["client_id"]: r["d"] for r in conn.execute(
-        "SELECT client_id, max(maj_le) AS d FROM relances WHERE statut = 'envoyee' GROUP BY client_id")}
+        "SELECT client_id, max(date_envoi) AS d FROM relances WHERE statut = 'envoyee' GROUP BY client_id")}
+    # Promesse, délai accordé ou paiement annoncé : relances suspendues jusqu'à la date convenue.
     promesses = {r["client_id"]: r["d"] for r in conn.execute(
         "SELECT client_id, max(date_promise) AS d FROM reponses_client"
-        " WHERE type = 'promesse' AND confirme = 1 AND date_promise >= ? GROUP BY client_id",
+        " WHERE type IN ('promesse', 'demande_delai', 'paiement_annonce') AND confirme = 1 AND date_promise >= ?"
+        " GROUP BY client_id",
         (ctx.reference.isoformat(),))}
     par_client: dict[int, dict] = {}
     for e in etats:
@@ -220,15 +222,21 @@ def file_du_jour(conn: sqlite3.Connection, poids: dict[str, Decimal] | None = No
     hists = historiques(conn, ctx, tous)
     faites: dict[int, set[str]] = {}
     derniere: dict[int, str] = {}
-    for r in conn.execute("SELECT facture_id, etape, maj_le FROM relances WHERE statut IN ('envoyee', 'en_cours_envoi')"):
+    en_attente = {r[0] for r in conn.execute(
+        "SELECT DISTINCT facture_id FROM relances WHERE statut IN ('brouillon', 'a_valider', 'validee')")}
+    for r in conn.execute("SELECT facture_id, etape, coalesce(date_envoi, date_preparation) AS d FROM relances"
+                          " WHERE statut IN ('envoyee', 'en_cours_envoi')"):
         faites.setdefault(r["facture_id"], set()).add(r["etape"])
-        derniere[r["facture_id"]] = max(derniere.get(r["facture_id"], ""), r["maj_le"])
+        if r["d"]:
+            derniere[r["facture_id"]] = max(derniere.get(r["facture_id"], ""), r["d"])
 
     file: list[Priorite] = []
     exclues: list[Exclusion] = []
     for e in tous:
         hist = hists.get(e.client_id, Historique())
         exclusion = _exclusion(e, hist, faites.get(e.id, set()), derniere.get(e.id), sequence, delai, ctx)
+        if exclusion is None and e.id in en_attente:
+            exclusion = Exclusion(e, "RELANCE_EN_ATTENTE", "Une relance préparée attend validation ou envoi")
         if exclusion:
             exclues.append(exclusion)
             continue

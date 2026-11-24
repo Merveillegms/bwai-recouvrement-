@@ -191,8 +191,38 @@ transition, incrémente la version de la facture et journalise l'ancien et le no
 | R4 | +45 | formel, échéancier | Oui |
 | R5 | +90 | escalade hors outil | Oui |
 
-- Délai minimal entre deux relances d'une même facture : 7 jours.
-- Une relance au plus par client et par jour : les factures d'un même client sont regroupées.
+- Délai minimal entre deux relances d'une même facture : 7 jours (date **métier** d'envoi).
+- Une relance au plus par client et par jour : les factures d'un même client sont regroupées dans un
+  **lot d'envoi** (un seul message, même s'il mêle plusieurs devises : un total par devise, jamais d'addition
+  entre devises).
+- **Idempotence** : clé `facture | étape | échéance`, contrainte UNIQUE en base. Le canal n'en fait pas partie,
+  pour qu'une même étape ne parte jamais deux fois, même sur deux canaux.
+- Une facture dont une relance attend validation ou envoi est écartée de la file (`RELANCE_EN_ATTENTE`).
+- Ton du lot = étape la plus avancée. Si les factures du lot sont à des étapes différentes, le corps du message
+  reste neutre et exact (pas de « malgré nos rappels » pour une facture jamais relancée).
+- Validation humaine **par lot** : si une seule facture du lot l'exige, tout le lot attend (un message n'est
+  jamais envoyé en deux morceaux le même jour).
+- Canal : le canal préféré s'il est joignable, sinon le premier joignable (WhatsApp, SMS, e-mail) ; aucun
+  contact → pas de message, facture signalée « à traiter par un humain ».
+- R5 ne produit aucun message client : un dossier d'escalade est remis au responsable du recouvrement.
+- Envoi refusé hors de la plage horaire (08:00 – 19:00, réglable) et pendant un arrêt d'urgence.
+
+### Messages
+
+Français standard, vouvoiement, légère touche béninoise (« nous espérons que vous allez bien et que les affaires
+se portent bien », « bonne journée à vous »), plus formel à mesure que les étapes avancent. Montants, dates,
+références et numéros sont insérés par le code. Mots interdits (menace, intimidation, mention de tiers)
+et tutoiement sont détectés : un écart envoie le lot en validation humaine. Longueur maximale : SMS 640,
+WhatsApp 1 500, e-mail 5 000 caractères.
+
+### Réponses des clients (saisie humaine)
+
+| Réponse | Effet |
+|---|---|
+| Promesse / demande de délai | date obligatoire (≤ 90 j) ; relances suspendues jusqu'à cette date, puis reprises |
+| Paiement annoncé | relances suspendues 3 jours (réglable) |
+| Litige | la facture passe en litige (facture obligatoire) |
+| Injoignable, demande d'information, sans rapport | tracé au journal, sans effet |
 
 ## 10. Priorisation
 

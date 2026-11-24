@@ -92,7 +92,7 @@ def test_relance_recente_etape_faite_et_promesse(petit_jeu):
 
     def relance(etape, il_y_a):
         conn.execute("INSERT INTO relances (facture_id, client_id, etape, canal, periode, cle_idempotence, statut,"
-                     " version_facture, solde_prepare, maj_le) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                     " version_facture, solde_prepare, date_envoi) VALUES (?,?,?,?,?,?,?,?,?,?)",
                      (b.id, b.client_id, etape, "sms", "p", f"{etape}-{il_y_a}", "envoyee", b.version, b.solde,
                       (REF - timedelta(days=il_y_a)).isoformat()))
 

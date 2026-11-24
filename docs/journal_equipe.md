@@ -16,3 +16,8 @@ Décisions techniques et métier, dans l'ordre où elles ont été prises.
 | 2026-11-24 | Date de référence du jeu de démo : 2026-12-15 ; graine 20261124 | Résultats figés |
 | 2026-11-24 | Python 3.10 minimum | Version installée sur les postes de l'équipe |
 | 2026-11-24 | Pays de référence : Bénin (XOF, +229, MTN MoMo / Moov Money / Celtiis Cash, jours fériés béninois) | Contexte du hackathon |
+| 2026-11-24 | Messages : vouvoiement, français standard, légère touche béninoise | Choix de l'équipe |
+| 2026-11-24 | Entreprise fictive « Distribution Atlantique SARL » (paramètre `entreprise`) | Signature et bloc de paiement |
+| 2026-11-24 | Clé d'idempotence facture + étape + échéance (sans le canal) | Une étape ne part jamais deux fois, même sur deux canaux |
+| 2026-11-24 | Validation humaine décidée par lot (un message par client et par jour) | Jamais de message en deux morceaux |
+| 2026-11-24 | Fiche PDF avec fpdf2 (LGPL-3.0, utilisée comme bibliothèque) | Simple, sans dépendance système |

@@ -148,15 +148,37 @@ Autre rejet : `VALEUR_INVALIDE` (colonne litige ou sensible ni « oui » ni « n
 
 Dans l'ordre :
 
-1. `id_transaction` déjà connu → rejet `DOUBLON_PAIEMENT`.
-2. Référence valide et connue → **rapprochement automatique**.
+1. `id_transaction` déjà connu → rejet `DOUBLON_PAIEMENT` (dès l'import).
+2. Référence valide et connue, facture ouverte, même devise → **rapprochement automatique** (seul cas automatique).
 3. Référence valide mais inconnue → à valider (`REFERENCE_INCONNUE`).
-4. Référence présente mais chiffre de contrôle faux → à valider (`REFERENCE_INVALIDE`).
-5. Pas de référence : téléphone du payeur → client, puis montant = solde d'**une seule** facture ouverte
+4. Référence présente mais chiffre de contrôle faux → à valider (`REFERENCE_INVALIDE`), avec proposition si
+   le montant et le téléphone désignent une seule facture.
+5. Référence connue mais facture déjà soldée (`FACTURE_DEJA_SOLDEE`, doublon possible), clôturée
+   (`FACTURE_CLOTUREE`) ou dans une autre devise (`DEVISE_DIFFERENTE`) → à valider.
+6. Pas de référence : téléphone du payeur → client (comparaison sur les 8 derniers chiffres, ce qui couvre
+   l'ancien et le nouveau format béninois), puis montant = solde d'**une seule** facture ouverte
    → proposition à valider (`PROPOSITION_MONTANT_CLIENT`).
-6. Plusieurs factures possibles → à valider (`RAPPROCHEMENT_AMBIGU`).
+7. Plusieurs factures possibles → à valider (`RAPPROCHEMENT_AMBIGU`) ; aucune → `NON_IDENTIFIE`.
 
-Aucun rapprochement ambigu n'est appliqué automatiquement.
+Les paiements avec référence sont traités en premier, pour que les propositions par montant portent sur
+des soldes à jour. Relancer le rapprochement ne retraite rien (idempotent).
+
+Décisions humaines : **valider** (confirmer la proposition, ou choisir une autre facture avec un motif),
+**rejeter** (paiement étranger, motif obligatoire), **annuler un rapprochement** (validateur, motif obligatoire :
+le paiement repart à valider, la facture retrouve son solde).
+
+## 8 bis. Transitions de statut
+
+Le statut enregistré n'est modifié que par une seule fonction (`statuts.actualiser`), qui vérifie la
+transition, incrémente la version de la facture et journalise l'ancien et le nouveau statut avec la règle.
+
+- `cloturee` est un état final.
+- **Réservé à un humain** : entrer en litige, suspension ou clôture ; en sortir ; faire revenir une facture
+  payée vers un état dû (annulation de rapprochement).
+- **Automatique** : passage à échéance (`a_echoir` → `echue`), paiements rapprochés par référence.
+- Un avoir réduit le solde ; des avoirs couvrant **tout** le montant clôturent la facture (annulation).
+- Litige levé, reprise, avoir et passage en perte sont réservés au rôle validateur (sauf déclarer un litige
+  ou suspendre, ouverts au gestionnaire).
 
 ## 9. Séquence de relances (paramètre `sequence_relances`)
 

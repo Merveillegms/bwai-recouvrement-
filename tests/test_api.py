@@ -66,3 +66,34 @@ def test_utilisateur_inconnu(client):
 def test_type_inconnu_message_clair(client):
     r = client.post("/api/imports/devis", files={"fichier": ("x.csv", b"a;b\n1;2", "text/csv")})
     assert r.status_code == 422 and r.json()["code"] == "TYPE_INCONNU"
+
+
+def test_parcours_paiements_et_statuts(client):
+    for type_, nom in [("clients", "clients.csv"), ("factures", "factures_lot1.csv"),
+                       ("paiements", "paiements_mobile_money.csv")]:
+        r = _envoyer(client, type_, nom)
+        assert r.status_code == 201
+    assert r.json()["rapprochement"]["RAPPROCHE"] > 0
+
+    a_valider = client.get("/api/paiements?statut=a_valider").json()
+    proposition = next(p for p in a_valider if p["motif_rapprochement"] == "PROPOSITION_MONTANT_CLIENT")
+    r = client.post(f"/api/paiements/{proposition['id']}/valider", json={})
+    assert r.status_code == 200 and r.json()["statut"] == "payee"
+
+    echue = client.get("/api/factures?statut=echue").json()[0]
+    assert echue["solde_affiche"].endswith("FCFA") and echue["tranche"]
+    r = client.post(f"/api/factures/{echue['id']}/litige", json={"motif": "Contestation"})
+    assert r.status_code == 200 and r.json()["statut"] == "en_litige"
+    # Lever un litige est réservé au validateur
+    assert client.post(f"/api/factures/{echue['id']}/lever-litige", json={"motif": "ok"}).status_code == 403
+    r = client.post(f"/api/factures/{echue['id']}/lever-litige", json={"motif": "ok"},
+                    headers={"X-Utilisateur": "validateur"})
+    assert r.json()["statut"] == "echue"
+
+    r = client.post(f"/api/factures/{echue['id']}/avoirs", json={"montant": "abc", "motif": "x"},
+                    headers={"X-Utilisateur": "validateur"})
+    assert r.status_code == 422 and r.json()["code"] == "MONTANT_INVALIDE"
+
+    detail = client.get(f"/api/factures/{echue['id']}").json()
+    actions = [h["action"] for h in detail["historique"]]
+    assert actions[0] == "creation_facture" and "declaration_litige" in actions and "levee_litige" in actions

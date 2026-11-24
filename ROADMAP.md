@@ -75,17 +75,18 @@
 
 **Sortie** : chaque anomalie du jeu piégé est détectée, prouvée par un test. ✅ 100 % des lignes conformes à `attendus.json` (clients, 2 lots de factures, paiements) ; 125 tests, couverture 92 %.
 
-### Phase 2 · Moteur de calcul (fonctions pures)
-- [ ] Solde = TTC − paiements rapprochés − avoirs ; trop-perçu et paiement partiel
-- [ ] Une seule fonction d'arrondi
-- [ ] Retard calculé à une « date du jour » injectable ; jours ouvrés / fériés en option
-- [ ] Tranches : non échue, 1-15, 16-30, 31-60, 61-90, > 90
-- [ ] Statuts : à échoir, échue, partiellement payée, payée, en litige, suspendue, clôturée
-- [ ] Table de transitions autorisées ; chaque transition est journalisée
-- [ ] Rapprochement : référence exacte → montant + client → proposition à valider ; doublons et références inconnues détectés ; aucun rapprochement ambigu appliqué seul
-- [ ] Tests unitaires, tests par propriétés, non-régression sur le jeu figé
+### Phase 2 · Moteur de calcul (fonctions pures) ✅ (24/11)
+- [x] Solde = TTC − paiements rapprochés − avoirs ; trop-perçu et paiement partiel
+- [x] Une seule fonction d'arrondi (`montants.arrondir`, demi-supérieur)
+- [x] Retard calculé à une « date du jour » injectable ; jours ouvrés en option avec fériés béninois (Pâques calculé)
+- [x] Tranches : non échue, 1-15, 16-30, 31-60, 61-90, > 90
+- [x] Statuts : à échoir, échue, partiellement payée, payée, en litige, suspendue, clôturée
+- [x] Table de transitions autorisées, décisions réservées à l'humain ; chaque transition est journalisée et incrémente la version
+- [x] Rapprochement : référence exacte → montant + téléphone → proposition à valider ; références inconnues / mal saisies, facture déjà soldée, autre devise ; aucun rapprochement ambigu appliqué seul ; idempotent
+- [x] Actions humaines : litige, suspension, avoir, passage en perte, valider / rejeter / annuler un rapprochement
+- [x] Tests unitaires, tests par propriétés, non-régression sur le jeu figé
 
-**Sortie** : 100 % des cas donnent le bon statut et le bon retard ; couverture du moteur > 90 %.
+**Sortie** : 100 % des cas donnent le bon statut et le bon retard ; couverture du moteur > 90 %. ✅ 115 factures et 34 paiements conformes à l'oracle (statut, retard, tranche, solde, trop-perçu, drapeaux, rapprochement) ; couverture du moteur 96 % ; 160 tests.
 
 ### Phase 3 · Priorisation
 - [ ] Score = somme pondérée (ancienneté, solde, historique de retard) ; poids dans `parametres`

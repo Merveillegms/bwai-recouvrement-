@@ -296,17 +296,18 @@ def _traiter_factures(conn, import_id, lignes, auteur) -> tuple[list[Anomalie], 
         statut = calculs.statut(montant_ttc=f.montant, total_paye=0, echeance=f.echeance, reference=reference,
                                 en_litige=f.litige)
         reference_paiement = generer_reference(f.code_client, f.numero)
-        conn.execute(
+        facture_id = conn.execute(
             "INSERT INTO factures (numero, client_id, date_emission, date_echeance, montant_ttc, devise,"
             " reference_paiement, statut, en_litige, a_verifier, motif_verification, import_id)"
             " VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
             (f.numero, client["id"], f.emission.isoformat(), f.echeance.isoformat(), f.montant, f.devise,
              reference_paiement, statut, int(f.litige), int(bool(codes)), ",".join(codes) or None, import_id),
-        )
+        ).lastrowid
         journal.ajouter(conn, acteur=auteur, type_acteur="humain", action="creation_facture", objet_type="facture",
-                        objet_id=f"{f.code_client}/{f.numero}",
-                        apres={"montant_ttc": f.montant, "devise": f.devise, "echeance": f.echeance.isoformat(),
-                               "statut": statut, "a_verifier": codes},
+                        objet_id=facture_id,
+                        apres={"numero": f.numero, "client": f.code_client, "montant_ttc": f.montant,
+                               "devise": f.devise, "echeance": f.echeance.isoformat(), "statut": statut,
+                               "a_verifier": codes},
                         regle="IMPORT" + ("+" + "+".join(codes) if codes else ""))
         anomalies.extend(f.avertissements)
         avertissements += bool(codes)

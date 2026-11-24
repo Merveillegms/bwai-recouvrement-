@@ -11,17 +11,16 @@ import json
 import sqlite3
 from datetime import datetime, timezone
 
-from app import calculs, journal, parametres
+from app import journal, statuts
 from app.db import transaction
+from app.erreurs import ErreurMetier
 from app.importer import Anomalie, lire_ligne_facture
 
 CANAUX = ("sms", "whatsapp", "email")
 
 
-class ResolutionImpossible(Exception):
-    def __init__(self, code: str, message: str) -> None:
-        super().__init__(message)
-        self.code, self.message = code, message
+class ResolutionImpossible(ErreurMetier):
+    pass
 
 
 def _exiger_motif(motif: str | None) -> str:
@@ -74,22 +73,20 @@ def resoudre_anomalie(conn: sqlite3.Connection, anomalie_id: int, decision: str,
                 raise ResolutionImpossible("INTROUVABLE", "La facture en conflit n'existe plus")
             if raison := _facture_engagee(conn, existante["id"]):
                 raise ResolutionImpossible("FACTURE_ENGAGEE", f"Remplacement impossible : {raison}")
-            statut = calculs.statut(montant_ttc=lue.montant, total_paye=0, echeance=lue.echeance,
-                                    reference=parametres.date_du_jour(conn), en_litige=lue.litige,
-                                    suspendue=bool(existante["suspendue"]))
             conn.execute(
-                "UPDATE factures SET date_emission=?, date_echeance=?, montant_ttc=?, devise=?, en_litige=?, statut=?,"
-                " version = version + 1, maj_le = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?",
-                (lue.emission.isoformat(), lue.echeance.isoformat(), lue.montant, lue.devise, int(lue.litige), statut,
+                "UPDATE factures SET date_emission=?, date_echeance=?, montant_ttc=?, devise=?, en_litige=? WHERE id = ?",
+                (lue.emission.isoformat(), lue.echeance.isoformat(), lue.montant, lue.devise, int(lue.litige),
                  existante["id"]))
             journal.ajouter(conn, acteur=auteur, type_acteur="humain", action="remplacement_facture",
-                            objet_type="facture", objet_id=f"{lue.code_client}/{lue.numero}",
+                            objet_type="facture", objet_id=existante["id"],
                             avant={k: existante[k] for k in ("date_emission", "date_echeance", "montant_ttc",
-                                                              "devise", "en_litige", "statut")},
+                                                              "devise", "en_litige")},
                             apres={"date_emission": lue.emission.isoformat(), "date_echeance": lue.echeance.isoformat(),
                                    "montant_ttc": lue.montant, "devise": lue.devise, "en_litige": int(lue.litige),
-                                   "statut": statut, "motif": motif},
+                                   "motif": motif},
                             regle="RESOLUTION_CONFLIT_NUMERO")
+            statuts.actualiser(conn, existante["id"], auteur=auteur, type_acteur="humain",
+                               regle="RESOLUTION_CONFLIT_NUMERO", donnees_modifiees=True)
             apres["facture_id"] = existante["id"]
         conn.execute("UPDATE import_anomalies SET resolution=?, motif_resolution=?, resolu_par=?, resolu_le=?"
                      " WHERE id=?", ("remplacee" if decision == "remplacer" else "ignoree", motif, auteur,
@@ -129,11 +126,12 @@ def annuler_facture(conn: sqlite3.Connection, facture_id: int, auteur: str, moti
             raise ResolutionImpossible("DEJA_CLOTUREE", "Facture déjà clôturée")
         if raison := _facture_engagee(conn, facture_id):
             raise ResolutionImpossible("FACTURE_ENGAGEE", f"Annulation impossible : {raison}")
-        conn.execute("UPDATE factures SET statut = 'cloturee', motif_cloture = ?, a_verifier = 0, version = version + 1,"
-                     " maj_le = strftime('%Y-%m-%dT%H:%M:%fZ','now') WHERE id = ?", (motif, facture_id))
+        conn.execute("UPDATE factures SET motif_cloture = ?, a_verifier = 0 WHERE id = ?", (motif, facture_id))
         journal.ajouter(conn, acteur=auteur, type_acteur="humain", action="annulation_facture",
                         objet_type="facture", objet_id=facture_id, avant={"statut": f["statut"]},
                         apres={"statut": "cloturee", "motif": motif}, regle="VERIFICATION_HUMAINE")
+        statuts.actualiser(conn, facture_id, auteur=auteur, type_acteur="humain", regle="VERIFICATION_HUMAINE",
+                           donnees_modifiees=True)
 
 
 def valider_client(conn: sqlite3.Connection, client_id: int, auteur: str, *, nom: str, telephone: str | None = None,

@@ -13,8 +13,11 @@ from fastapi import Depends, FastAPI, File, Form, Header, Request, UploadFile
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
-from app import importer, resolution
+from app import etat as moteur
+from app import importer, rapprochement, resolution, statuts
 from app.db import connecter, version_schema
+from app.erreurs import ErreurMetier
+from app.normalisation import ErreurValeur, lire_montant
 
 app = FastAPI(title="Recouvrement BWAI", version="0.2.0")
 
@@ -37,13 +40,14 @@ def _import_refuse(_: Request, e: importer.ImportRefuse) -> JSONResponse:
     return JSONResponse(status_code=statut, content={"code": e.code, "message": e.message, "details": e.details})
 
 
-_STATUTS_RESOLUTION = {"INTROUVABLE": 404, "DEJA_RESOLUE": 409, "DEJA_CLOTUREE": 409, "FACTURE_ENGAGEE": 409,
-                       "CLIENT_EN_ATTENTE": 409}
+_STATUTS_ERREURS = {"INTROUVABLE": 404, "DEJA_RESOLUE": 409, "DEJA_CLOTUREE": 409, "FACTURE_ENGAGEE": 409,
+                    "CLIENT_EN_ATTENTE": 409, "TRANSITION_INTERDITE": 409, "DECISION_HUMAINE_REQUISE": 409,
+                    "NON_APPLICABLE": 409}
 
 
-@app.exception_handler(resolution.ResolutionImpossible)
-def _resolution_impossible(_: Request, e: resolution.ResolutionImpossible) -> JSONResponse:
-    return JSONResponse(status_code=_STATUTS_RESOLUTION.get(e.code, 422),
+@app.exception_handler(ErreurMetier)
+def _erreur_metier(_: Request, e: ErreurMetier) -> JSONResponse:
+    return JSONResponse(status_code=_STATUTS_ERREURS.get(e.code, 422),
                         content={"code": e.code, "message": e.message, "details": {}})
 
 
@@ -66,6 +70,11 @@ def utilisateur(x_utilisateur: str = Header(default="gestionnaire"), conn: sqlit
 def _ecriture_autorisee(u: dict) -> None:
     if u["role"] == "auditeur":
         raise ErreurApi(403, "LECTURE_SEULE", "Le rôle auditeur est en lecture seule")
+
+
+def _validateur_requis(u: dict) -> None:
+    if u["role"] != "validateur":
+        raise ErreurApi(403, "VALIDATEUR_REQUIS", "Cette décision est réservée au validateur")
 
 
 async def _lire_fichier(fichier: UploadFile) -> bytes:
@@ -101,7 +110,11 @@ async def importer_fichier(
     except json.JSONDecodeError:
         raise ErreurApi(422, "CORRESPONDANCE_INVALIDE", "La correspondance de colonnes n'est pas un JSON valide") from None
     contenu = await _lire_fichier(fichier)
-    return importer.importer(conn, type_import, contenu, fichier.filename or "fichier", u["identifiant"], corr).en_dict()
+    resultat = importer.importer(conn, type_import, contenu, fichier.filename or "fichier", u["identifiant"],
+                                 corr).en_dict()
+    if type_import == "paiements":  # rapprochement immédiat des paiements importés
+        resultat["rapprochement"] = rapprochement.rapprocher_tout(conn)
+    return resultat
 
 
 @app.get("/api/imports")
@@ -196,3 +209,136 @@ def valider(client_id: int, corps: FicheClient, conn: sqlite3.Connection = Depen
     _ecriture_autorisee(u)
     liberees = resolution.valider_client(conn, client_id, u["identifiant"], **corps.model_dump())
     return {"statut": "ok", "factures_liberees": liberees}
+
+
+# ------------------------------------------------------------- factures et statuts
+@app.get("/api/factures")
+def lister_factures(statut: str | None = None, tranche: str | None = None, client: str | None = None,
+                    drapeau: str | None = None, conn: sqlite3.Connection = Depends(base),
+                    u: dict = Depends(utilisateur)) -> list[dict]:
+    """État calculé de chaque facture (le frontend n'a rien à calculer)."""
+    condition, params = ("c.code = ?", (client.upper(),)) if client else ("", ())
+    resultat = []
+    for e in moteur.etats(conn, condition, params):
+        if (statut and e.statut != statut) or (tranche and e.tranche != tranche) or (drapeau and drapeau not in e.drapeaux):
+            continue
+        resultat.append(e.en_dict())
+    return resultat
+
+
+@app.get("/api/factures/{facture_id}")
+def detail_facture(facture_id: int, conn: sqlite3.Connection = Depends(base), u: dict = Depends(utilisateur)) -> dict:
+    e = moteur.etat(conn, facture_id)
+    if e is None:
+        raise ErreurApi(404, "INTROUVABLE", "Facture introuvable")
+    paiements = [dict(p) for p in conn.execute(
+        "SELECT * FROM paiements WHERE facture_id = ? OR facture_proposee_id = ? ORDER BY date_paiement, id",
+        (facture_id, facture_id))]
+    avoirs = [dict(a) for a in conn.execute("SELECT * FROM avoirs WHERE facture_id = ? ORDER BY id", (facture_id,))]
+    historique = [dict(j) for j in conn.execute(
+        "SELECT id, horodatage, acteur, type_acteur, action, avant, apres, regle FROM journal"
+        " WHERE objet_type = 'facture' AND objet_id = ? ORDER BY id", (str(facture_id),))]
+    return e.en_dict() | {"paiements": paiements, "avoirs": avoirs, "historique": historique}
+
+
+class Avoir(BaseModel):
+    montant: str
+    motif: str | None = None
+
+
+@app.post("/api/factures/{facture_id}/litige")
+def declarer_litige(facture_id: int, corps: Motif, conn: sqlite3.Connection = Depends(base),
+                    u: dict = Depends(utilisateur)) -> dict:
+    _ecriture_autorisee(u)
+    return statuts.declarer_litige(conn, facture_id, u["identifiant"], corps.motif).en_dict()
+
+
+@app.post("/api/factures/{facture_id}/lever-litige")
+def lever_litige(facture_id: int, corps: Motif, conn: sqlite3.Connection = Depends(base),
+                 u: dict = Depends(utilisateur)) -> dict:
+    _validateur_requis(u)
+    return statuts.lever_litige(conn, facture_id, u["identifiant"], corps.motif).en_dict()
+
+
+@app.post("/api/factures/{facture_id}/suspendre")
+def suspendre(facture_id: int, corps: Motif, conn: sqlite3.Connection = Depends(base),
+              u: dict = Depends(utilisateur)) -> dict:
+    _ecriture_autorisee(u)
+    return statuts.suspendre(conn, facture_id, u["identifiant"], corps.motif).en_dict()
+
+
+@app.post("/api/factures/{facture_id}/reprendre")
+def reprendre(facture_id: int, corps: Motif, conn: sqlite3.Connection = Depends(base),
+              u: dict = Depends(utilisateur)) -> dict:
+    _ecriture_autorisee(u)
+    return statuts.reprendre(conn, facture_id, u["identifiant"], corps.motif).en_dict()
+
+
+@app.post("/api/factures/{facture_id}/avoirs")
+def creer_avoir(facture_id: int, corps: Avoir, conn: sqlite3.Connection = Depends(base),
+                u: dict = Depends(utilisateur)) -> dict:
+    _validateur_requis(u)
+    e = moteur.etat(conn, facture_id)
+    if e is None:
+        raise ErreurApi(404, "INTROUVABLE", "Facture introuvable")
+    try:
+        montant = lire_montant(corps.montant, e.decimales)
+    except ErreurValeur as err:
+        raise ErreurApi(422, err.code, err.message) from None
+    return statuts.creer_avoir(conn, facture_id, montant, u["identifiant"], corps.motif).en_dict()
+
+
+@app.post("/api/factures/{facture_id}/perte")
+def passer_en_perte(facture_id: int, corps: Motif, conn: sqlite3.Connection = Depends(base),
+                    u: dict = Depends(utilisateur)) -> dict:
+    _validateur_requis(u)
+    return statuts.passer_en_perte(conn, facture_id, u["identifiant"], corps.motif).en_dict()
+
+
+@app.post("/api/recalcul")
+def recalculer(conn: sqlite3.Connection = Depends(base), u: dict = Depends(utilisateur)) -> dict:
+    return {"changements": statuts.recalculer_tout(conn)}
+
+
+# --------------------------------------------------------------------- paiements
+class AffectationPaiement(BaseModel):
+    facture_id: int | None = None
+    motif: str | None = None
+
+
+@app.get("/api/paiements")
+def lister_paiements(statut: str | None = None, conn: sqlite3.Connection = Depends(base),
+                     u: dict = Depends(utilisateur)) -> list[dict]:
+    sql, params = "SELECT * FROM paiements", ()
+    if statut:
+        sql, params = sql + " WHERE statut_rapprochement = ?", (statut,)
+    return [dict(p) for p in conn.execute(sql + " ORDER BY id", params)]
+
+
+@app.post("/api/rapprochement")
+def lancer_rapprochement(conn: sqlite3.Connection = Depends(base), u: dict = Depends(utilisateur)) -> dict:
+    _ecriture_autorisee(u)
+    return {"resume": rapprochement.rapprocher_tout(conn)}
+
+
+@app.post("/api/paiements/{paiement_id}/valider")
+def valider_paiement(paiement_id: int, corps: AffectationPaiement, conn: sqlite3.Connection = Depends(base),
+                     u: dict = Depends(utilisateur)) -> dict:
+    _ecriture_autorisee(u)
+    return rapprochement.valider_paiement(conn, paiement_id, u["identifiant"], corps.facture_id, corps.motif).en_dict()
+
+
+@app.post("/api/paiements/{paiement_id}/rejeter")
+def rejeter_paiement(paiement_id: int, corps: Motif, conn: sqlite3.Connection = Depends(base),
+                     u: dict = Depends(utilisateur)) -> dict:
+    _ecriture_autorisee(u)
+    rapprochement.rejeter_paiement(conn, paiement_id, u["identifiant"], corps.motif)
+    return {"statut": "ok"}
+
+
+@app.post("/api/paiements/{paiement_id}/annuler-rapprochement")
+def annuler_rapprochement(paiement_id: int, corps: Motif, conn: sqlite3.Connection = Depends(base),
+                          u: dict = Depends(utilisateur)) -> dict:
+    _validateur_requis(u)
+    rapprochement.annuler_rapprochement(conn, paiement_id, u["identifiant"], corps.motif)
+    return {"statut": "ok"}

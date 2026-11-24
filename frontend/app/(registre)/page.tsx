@@ -141,7 +141,8 @@ function Detail({ p }: { p: Priorite }) {
   const f = p.facture;
   const h = p.historique;
   return (
-    <aside className="grid gap-4 border border-filet bg-[#f8f5ec] p-5 lg:sticky lg:top-32" aria-label="Pourquoi cette facture est ici">
+    <aside className="grid gap-4 border border-filet bg-[#f8f5ec] p-5 lg:sticky lg:top-32 lg:max-h-[calc(100dvh-9rem)] lg:overflow-y-auto lg:overscroll-contain"
+           aria-label="Pourquoi cette facture est ici" tabIndex={0}>
       <div>
         <p className="chiffres text-xs text-encre-pale">{f.numero} · échéance {date(f.date_echeance)} · réf. {f.reference_paiement}</p>
         <h2 className="text-2xl font-semibold">{f.nom_client}</h2>

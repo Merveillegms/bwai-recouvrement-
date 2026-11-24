@@ -61,6 +61,7 @@ def file_de_validation(conn: sqlite3.Connection) -> list[dict]:
             "escalade": relances[0]["etape"] == "R5", "message": relances[0]["message"],
             "raisons": (relances[0]["motif_validation"] or "").split("; "),
             "groupable": est_groupable(relances), "date_preparation": relances[0]["date_preparation"],
+            "redige_par_ia": bool(relances[0]["redige_par_ia"]),
             "factures": [moteur.etat(conn, r["facture_id"], ctx).en_dict() | {"etape": r["etape"]} for r in relances],
         })
     return resultat

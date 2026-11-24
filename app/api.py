@@ -23,6 +23,7 @@ from pydantic import BaseModel
 from app import etat as moteur
 from app import (audit, auth, demo, fiche, importer, journal, parametres, priorisation, rapprochement, relances,
                  reponses, resolution, statuts, tableau_bord, validation)
+from app import config
 from app.db import connecter, version_schema
 from app.erreurs import ErreurMetier
 from app.montants import depuis_unites_mineures, formater
@@ -52,7 +53,7 @@ def _import_refuse(_: Request, e: importer.ImportRefuse) -> JSONResponse:
 _STATUTS_ERREURS = {"INTROUVABLE": 404, "DEJA_RESOLUE": 409, "DEJA_CLOTUREE": 409, "FACTURE_ENGAGEE": 409,
                     "CLIENT_EN_ATTENTE": 409, "TRANSITION_INTERDITE": 409, "DECISION_HUMAINE_REQUISE": 409,
                     "NON_APPLICABLE": 409, "ARRET_URGENCE": 423, "HORS_PLAGE_HORAIRE": 409,
-                    "TRAITEMENT_EN_COURS": 409, "IDENTIFIANTS_INVALIDES": 401, "VALIDATEUR_REQUIS": 403, "DEJA_CHARGE": 409, "MODE_REEL": 409}
+                    "TRAITEMENT_EN_COURS": 409, "IDENTIFIANTS_INVALIDES": 401, "VALIDATEUR_REQUIS": 403, "DEJA_CHARGE": 409, "MODE_REEL": 409, "IA_DESACTIVEE": 409, "DEJA_TRAITEE": 409}
 
 
 @app.exception_handler(ErreurMetier)
@@ -768,3 +769,115 @@ def demo_paiement(corps: PaiementDemo, conn: sqlite3.Connection = Depends(base),
 def demo_executer(conn: sqlite3.Connection = Depends(base), u: dict = Depends(utilisateur)) -> dict:
     _ecriture_autorisee(u)
     return demo.executer(conn, u["identifiant"])
+
+
+# ------------------------------------------------------------------------ IA encadrée
+def _fournisseur_ia():
+    """Fournisseur de rédaction configuré dans .env (remplaçable dans les tests)."""
+    from app.ia.fournisseurs import fournisseur_configure
+    return fournisseur_configure()
+
+
+@app.get("/api/ia/etat")
+def ia_etat(conn: sqlite3.Connection = Depends(base), u: dict = Depends(utilisateur)) -> dict:
+    from app.ia import classification
+    f = _fournisseur_ia()
+    evaluation = config.RACINE / "docs" / "ia_evaluation.json"
+    resume = json.loads(evaluation.read_text(encoding="utf-8"))["classification"] if evaluation.exists() else None
+    appels = {r["statut"]: r["n"] for r in conn.execute(
+        "SELECT statut, count(*) AS n FROM ia_appels WHERE fonction = 'redaction' GROUP BY statut")}
+    return {
+        "active": parametres.lire(conn, "ia_active"),
+        "redaction": {"configuree": f is not None, "fournisseur": f.nom if f else None, "modele": f.modele if f else None,
+                      "appels": appels},
+        "classification": {"modele": classification.VERSION_MODELE, "categories": list(classification.CATEGORIES),
+                           "exactitude": resume and resume["exactitude"],
+                           "rappel_litige": resume and resume["litige"]["rappel_signalement"],
+                           "seuil_confiance": parametres.lire(conn, "ia_seuil_confiance")},
+    }
+
+
+class Activation(BaseModel):
+    actif: bool
+
+
+@app.post("/api/ia/activer")
+def ia_activer(corps: Activation, conn: sqlite3.Connection = Depends(base), u: dict = Depends(utilisateur)) -> dict:
+    _validateur_requis(u)
+    parametres.ecrire(conn, "ia_active", corps.actif, u["identifiant"])
+    return {"active": corps.actif}
+
+
+class Limite(BaseModel):
+    limite: int = 10
+
+
+@app.post("/api/ia/rediger")
+def ia_rediger(corps: Limite, conn: sqlite3.Connection = Depends(base), u: dict = Depends(utilisateur)) -> dict:
+    """Fait rédiger par l'IA les messages préparés aujourd'hui (repli sur le gabarit en cas de doute)."""
+    from app.ia.redaction import rediger_lots_du_jour
+    _ecriture_autorisee(u)
+    f = _fournisseur_ia()
+    if f is None:
+        raise ErreurApi(409, "IA_NON_CONFIGUREE",
+                        "Aucun modèle de rédaction configuré : ajoutez GEMINI_API_KEY (ou HF_TOKEN) dans le fichier .env")
+    return rediger_lots_du_jour(conn, f, u["identifiant"], limite=max(1, min(corps.limite, 30)))
+
+
+@app.post("/api/validation/gabarit")
+def revenir_au_gabarit(corps: Lot, conn: sqlite3.Connection = Depends(base), u: dict = Depends(utilisateur)) -> dict:
+    from app.ia.redaction import revenir_au_gabarit as revenir
+    _validateur_requis(u)
+    revenir(conn, corps.lot, u["identifiant"])
+    return {"statut": "ok"}
+
+
+@app.get("/api/ia/appels")
+def ia_appels(limite: int = 50, conn: sqlite3.Connection = Depends(base), u: dict = Depends(utilisateur)) -> list[dict]:
+    return [dict(r) for r in conn.execute("SELECT * FROM ia_appels ORDER BY id DESC LIMIT ?", (max(1, min(limite, 500)),))]
+
+
+class ReponseRecue(BaseModel):
+    client_id: int
+    texte: str
+    facture_id: int | None = None
+
+
+class Confirmation(BaseModel):
+    categorie: str
+    facture_id: int | None = None
+    date_promise: str | None = None
+
+
+@app.post("/api/reponses", status_code=201)
+def reponse_recue(corps: ReponseRecue, conn: sqlite3.Connection = Depends(base), u: dict = Depends(utilisateur)) -> dict:
+    from app.ia import accueil
+    _ecriture_autorisee(u)
+    return accueil.recevoir(conn, corps.client_id, corps.texte, u["identifiant"], corps.facture_id)
+
+
+@app.get("/api/reponses")
+def reponses_entrantes(statut: str = "a_traiter", conn: sqlite3.Connection = Depends(base),
+                       u: dict = Depends(utilisateur)) -> list[dict]:
+    lignes = conn.execute("SELECT r.*, c.code AS code_client, c.nom AS nom_client, f.numero FROM reponses_entrantes r"
+                          " JOIN clients c ON c.id = r.client_id LEFT JOIN factures f ON f.id = r.facture_id"
+                          " WHERE r.statut = ? ORDER BY r.id DESC", (statut,))
+    return [dict(r) | {"probabilites": json.loads(r["probabilites"]) if r["probabilites"] else None} for r in lignes]
+
+
+@app.post("/api/reponses/{entrante_id}/confirmer")
+def confirmer_reponse(entrante_id: int, corps: Confirmation, conn: sqlite3.Connection = Depends(base),
+                      u: dict = Depends(utilisateur)) -> dict:
+    from app.ia import accueil
+    _ecriture_autorisee(u)
+    return accueil.confirmer(conn, entrante_id, corps.categorie, u["identifiant"], facture_id=corps.facture_id,
+                             date_promise=corps.date_promise)
+
+
+@app.post("/api/reponses/{entrante_id}/ecarter")
+def ecarter_reponse(entrante_id: int, corps: Motif, conn: sqlite3.Connection = Depends(base),
+                    u: dict = Depends(utilisateur)) -> dict:
+    from app.ia import accueil
+    _ecriture_autorisee(u)
+    accueil.ecarter(conn, entrante_id, u["identifiant"], corps.motif)
+    return {"statut": "ok"}

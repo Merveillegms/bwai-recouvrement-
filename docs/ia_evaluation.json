@@ -1,0 +1,157 @@
+{
+  "classification": {
+    "modele": "nb-multinomial-1",
+    "exemples_entrainement": 150,
+    "exemples_evaluation": 48,
+    "exactitude": 0.854,
+    "par_classe": {
+      "promesse": {
+        "precision": 0.667,
+        "rappel": 1.0,
+        "exemples": 8
+      },
+      "paiement_annonce": {
+        "precision": 1.0,
+        "rappel": 1.0,
+        "exemples": 8
+      },
+      "litige": {
+        "precision": 0.8,
+        "rappel": 1.0,
+        "exemples": 8
+      },
+      "demande_delai": {
+        "precision": 0.875,
+        "rappel": 0.875,
+        "exemples": 8
+      },
+      "demande_info": {
+        "precision": 1.0,
+        "rappel": 0.875,
+        "exemples": 8
+      },
+      "sans_rapport": {
+        "precision": 1.0,
+        "rappel": 0.375,
+        "exemples": 8
+      }
+    },
+    "litige": {
+      "seuil": 0.25,
+      "rappel_signalement": 1.0,
+      "faux_signalements": 2
+    },
+    "seuils_de_confiance": [
+      {
+        "seuil": 0.4,
+        "couverture": 0.917,
+        "exactitude_au_dessus": 0.886,
+        "erreurs_sous_le_seuil": 2
+      },
+      {
+        "seuil": 0.5,
+        "couverture": 0.917,
+        "exactitude_au_dessus": 0.886,
+        "erreurs_sous_le_seuil": 2
+      },
+      {
+        "seuil": 0.6,
+        "couverture": 0.854,
+        "exactitude_au_dessus": 0.927,
+        "erreurs_sous_le_seuil": 4
+      },
+      {
+        "seuil": 0.7,
+        "couverture": 0.854,
+        "exactitude_au_dessus": 0.927,
+        "erreurs_sous_le_seuil": 4
+      },
+      {
+        "seuil": 0.8,
+        "couverture": 0.771,
+        "exactitude_au_dessus": 0.946,
+        "erreurs_sous_le_seuil": 5
+      }
+    ],
+    "matrice_confusion": {
+      "promesse": {
+        "promesse": 8
+      },
+      "paiement_annonce": {
+        "paiement_annonce": 8
+      },
+      "litige": {
+        "litige": 8
+      },
+      "demande_delai": {
+        "demande_delai": 7,
+        "promesse": 1
+      },
+      "demande_info": {
+        "demande_info": 7,
+        "demande_delai": 1
+      },
+      "sans_rapport": {
+        "promesse": 3,
+        "sans_rapport": 3,
+        "litige": 2
+      }
+    },
+    "erreurs": [
+      {
+        "texte": "Laissez moi jusqu'à la fin du mois prochain",
+        "attendu": "demande_delai",
+        "propose": "promesse",
+        "confiance": 0.9741
+      },
+      {
+        "texte": "Rappelez-moi svp",
+        "attendu": "demande_info",
+        "propose": "demande_delai",
+        "confiance": 0.7355
+      },
+      {
+        "texte": "Bonsoir",
+        "attendu": "sans_rapport",
+        "propose": "promesse",
+        "confiance": 0.3696
+      },
+      {
+        "texte": "Vous vendez du ciment ?",
+        "attendu": "sans_rapport",
+        "propose": "promesse",
+        "confiance": 0.3428
+      },
+      {
+        "texte": "Arrêtez les messages",
+        "attendu": "sans_rapport",
+        "propose": "litige",
+        "confiance": 0.5547
+      },
+      {
+        "texte": "ok d'accord",
+        "attendu": "sans_rapport",
+        "propose": "promesse",
+        "confiance": 0.8984
+      },
+      {
+        "texte": "Je veux passer une nouvelle commande",
+        "attendu": "sans_rapport",
+        "propose": "litige",
+        "confiance": 0.5054
+      }
+    ]
+  },
+  "redaction": {
+    "disponible": true,
+    "fournisseur": "gemini",
+    "modele": "gemini-3.5-flash",
+    "lots": 6,
+    "acceptes": 6,
+    "rejetes": 0,
+    "erreurs": 0,
+    "taux_acceptation": 1.0,
+    "raisons_de_rejet": {},
+    "duree_moyenne_ms": 11637
+  }
+}

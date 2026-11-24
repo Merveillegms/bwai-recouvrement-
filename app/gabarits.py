@@ -199,6 +199,20 @@ def rendre(etape: str, canal: str, client: str, lignes: list[LigneFacture], entr
     return Message(canal, objet, "\n\n".join(m for m in morceaux if m))
 
 
+def elements(canal: str, client: str, lignes: list[LigneFacture], entreprise: dict) -> dict[str, str]:
+    """Parties du message qui portent des valeurs : toujours produites par le code, jamais par l'IA.
+    Elles remplacent les marqueurs [[CLIENT]], [[FACTURES]], [[TOTAL]], [[PAIEMENT]], [[SIGNATURE]]."""
+    plusieurs = len(lignes) > 1
+    signature = (f"{entreprise['nom']} {entreprise['telephone']}" if canal == "sms" else
+                 f"Le service recouvrement\n{entreprise['nom']}, {entreprise['ville']}\n"
+                 f"{entreprise['telephone']} - {entreprise['email']}")
+    parties = {"CLIENT": client, "FACTURES": "\n".join(_ligne(l, canal) for l in lignes),
+               "PAIEMENT": _bloc_paiement(entreprise, plusieurs, canal), "SIGNATURE": signature}
+    if plusieurs:
+        parties["TOTAL"] = f"Total à régler : {_total(lignes)}."
+    return parties
+
+
 def controler_ton(texte: str) -> list[str]:
     """Écarts aux règles de ton (liste vide = conforme)."""
     bas = texte.lower()

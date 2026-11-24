@@ -1,0 +1,49 @@
+texte;categorie
+Je règle vendredi prochain;promesse
+On vous paie demain sans faute;promesse
+Je compte payer le 22;promesse
+Je passe payer dans la semaine;promesse
+Paiement prévu lundi par MTN;promesse
+je vais regler ça samedi;promesse
+D'ici la fin du mois ce sera payé;promesse
+Je vous envoie la somme mercredi;promesse
+J'ai payé ce matin par MoMo;paiement_annonce
+Le règlement a été envoyé hier;paiement_annonce
+C'est déjà réglé depuis lundi;paiement_annonce
+Nous avons effectué le paiement;paiement_annonce
+j'ai envoyé sur le numéro marchand;paiement_annonce
+Déjà payé voici la référence;paiement_annonce
+Le virement est fait;paiement_annonce
+Payé en espèces au livreur;paiement_annonce
+La facture est fausse on n'a pas reçu tout;litige
+Les cartons étaient endommagés;litige
+Ce n'est pas le prix convenu;litige
+Je refuse de payer des produits avariés;litige
+Vous avez facturé en double;litige
+Commande jamais livrée;litige
+Je conteste ce montant;litige
+Marchandise non conforme;litige
+Pouvez-vous me donner encore deux semaines ?;demande_delai
+Je souhaite payer en trois fois;demande_delai
+Accordez-moi un report svp;demande_delai
+Je n'ai pas l'argent maintenant attendez un peu;demande_delai
+Possible d'étaler les paiements ?;demande_delai
+Je demande un échéancier;demande_delai
+Laissez moi jusqu'à la fin du mois prochain;demande_delai
+La situation est difficile un délai svp;demande_delai
+Quelle est la référence à mettre ?;demande_info
+Envoyez-moi la facture en PDF;demande_info
+C'est pour quelle livraison ?;demande_info
+Comment payer avec Celtiis ?;demande_info
+Pouvez-vous m'expliquer ce montant ?;demande_info
+Quel numéro dois-je utiliser ?;demande_info
+Rappelez-moi svp;demande_info
+Combien je dois en tout ?;demande_info
+Bonsoir;sans_rapport
+Merci beaucoup;sans_rapport
+Vous vendez du ciment ?;sans_rapport
+Je ne suis pas concerné mauvais numéro;sans_rapport
+Joyeux Noël;sans_rapport
+Arrêtez les messages;sans_rapport
+ok d'accord;sans_rapport
+Je veux passer une nouvelle commande;sans_rapport

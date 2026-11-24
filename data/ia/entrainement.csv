@@ -1,0 +1,151 @@
+texte;categorie
+Bonjour je vais payer vendredi sans faute;promesse
+Je passe régler la facture lundi prochain;promesse
+On va payer le 20 de ce mois;promesse
+Je paie demain matin par MoMo;promesse
+D'accord je règle avant la fin du mois;promesse
+Merci pour le rappel je vous envoie l'argent samedi;promesse
+Je ferai le virement mardi;promesse
+Je viens payer au bureau jeudi;promesse
+ok je paye dans 3 jours;promesse
+Je vais solder ça la semaine prochaine;promesse
+Promis je paie aujourd'hui avant 18h;promesse
+Je regle le reste le 5 janvier;promesse
+Bonsoir paiement prévu pour mercredi;promesse
+je vous fais le depot demain;promesse
+Je m'engage à payer d'ici vendredi;promesse
+On vous paie à la fin de la semaine;promesse
+Je peux payer le 15;promesse
+Le comptable fait le paiement lundi;promesse
+Je vais envoyer par Moov demain;promesse
+Patientez jusqu'à samedi je paie;promesse
+Dès que je reçois mon argent vendredi je vous paie;promesse
+Je règle cette semaine sans faute;promesse
+ok noté je paie le 28;promesse
+Paiement demain inchallah;promesse
+Je passe vous voir mardi pour payer;promesse
+J'ai déjà payé hier par MoMo;paiement_annonce
+Le paiement a été fait ce matin;paiement_annonce
+Nous avons réglé la facture la semaine dernière;paiement_annonce
+C'est déjà payé vérifiez svp;paiement_annonce
+J'ai envoyé l'argent sur votre numéro MTN;paiement_annonce
+Paiement effectué via Moov ce matin;paiement_annonce
+On a fait le virement lundi;paiement_annonce
+J'ai payé au bureau j'ai le reçu;paiement_annonce
+deja regle par celtiis cash;paiement_annonce
+Bonjour j'ai payé hier soir avec la référence dans le motif;paiement_annonce
+Le transfert est parti tout à l'heure;paiement_annonce
+Mon comptable a déjà payé;paiement_annonce
+J'ai soldé la facture depuis;paiement_annonce
+Payé ! regardez votre compte;paiement_annonce
+je viens de faire le transfert;paiement_annonce
+Nous avons tout payé le 10;paiement_annonce
+J'ai réglé en espèces à votre commercial;paiement_annonce
+vérifiez votre momo j'ai envoyé;paiement_annonce
+Le paiement est fait depuis vendredi;paiement_annonce
+J'ai payé une partie hier le reste suit;paiement_annonce
+facture payée merci de mettre à jour;paiement_annonce
+J'ai déposé l'argent à l'agence;paiement_annonce
+On vous a payé par virement bancaire;paiement_annonce
+C'est réglé depuis longtemps;paiement_annonce
+Argent envoyé merci de confirmer réception;paiement_annonce
+La marchandise était abîmée je ne paie pas;litige
+Je conteste cette facture la quantité est fausse;litige
+Vous m'avez facturé deux fois la même livraison;litige
+Je n'ai jamais reçu cette commande;litige
+Le prix n'est pas celui convenu;litige
+Il manque 10 cartons dans la livraison;litige
+Les produits étaient périmés je refuse de payer;litige
+Cette facture ne me concerne pas;litige
+Erreur sur le montant ce n'est pas ce qu'on a dit;litige
+Je ne paierai pas tant que vous n'aurez pas remplacé la marchandise;litige
+La livraison est arrivée en retard et incomplète;litige
+Vous avez oublié la remise que nous avions négociée;litige
+On n'a rien commandé de tel;litige
+Les articles sont défectueux;litige
+c'est pas ma commande ça;litige
+La qualité ne correspond pas je retourne la marchandise;litige
+Je veux un avoir pour les produits cassés;litige
+Facture erronée merci de corriger;litige
+Vous nous avez livré le mauvais produit;litige
+Je conteste les frais de livraison;litige
+je refuse cette facture;litige
+montant faux on avait négocié moins;litige
+produit non conforme à la commande;litige
+la moitié des sacs étaient mouillés;litige
+double facturation vérifiez vos comptes;litige
+Je traverse une période difficile pouvez-vous m'accorder un délai ?;demande_delai
+Est-ce que je peux payer en plusieurs fois ?;demande_delai
+Accordez-moi encore un peu de temps svp;demande_delai
+Les affaires sont dures je demande un échéancier;demande_delai
+Pouvez-vous patienter un mois de plus ?;demande_delai
+Je peux payer moitié maintenant et moitié le mois prochain ?;demande_delai
+svp un délai je n'ai pas encore été payé par mes clients;demande_delai
+On peut s'arranger pour étaler le paiement ?;demande_delai
+Je demande un report de l'échéance;demande_delai
+Laissez-moi jusqu'au mois prochain;demande_delai
+J'ai besoin de plus de temps pour réunir la somme;demande_delai
+Est-il possible de payer par tranches ?;demande_delai
+Le marché est calme donnez-moi deux semaines de plus;demande_delai
+Je sollicite un délai supplémentaire;demande_delai
+Pouvons-nous convenir d'un plan de paiement ?;demande_delai
+Je ne peux pas tout payer maintenant;demande_delai
+un petit délai svp;demande_delai
+Donnez moi le temps de vendre le stock;demande_delai
+Peut-on repousser la date de paiement ?;demande_delai
+Je propose de payer une petite somme chaque semaine;demande_delai
+J'ai eu un problème de santé je demande du temps;demande_delai
+Possible d'avoir un échéancier sur trois mois ?;demande_delai
+Je vous prie de m'accorder un report;demande_delai
+Ma trésorerie est tendue pouvez-vous attendre ?;demande_delai
+je paierai par petites sommes si vous acceptez;demande_delai
+Quelle facture exactement ?;demande_info
+Pouvez-vous m'envoyer une copie de la facture ?;demande_info
+C'est pour quelle commande ?;demande_info
+Quel est le numéro pour payer ?;demande_info
+Je n'ai pas compris le montant pouvez-vous détailler ?;demande_info
+Comment je fais pour payer par Moov ?;demande_info
+Pouvez-vous me rappeler ?;demande_info
+Quelle référence je dois mettre ?;demande_info
+Envoyez-moi le détail des factures svp;demande_info
+C'est quel montant exactement ?;demande_info
+À quel nom je fais le dépôt ?;demande_info
+Vous êtes de quelle société ?;demande_info
+Je voudrais parler au commercial;demande_info
+Où se trouve votre bureau ?;demande_info
+Le numéro marchand est lequel ?;demande_info
+Est-ce que je peux payer en espèces ?;demande_info
+Pouvez-vous m'envoyer la fiche de paiement ?;demande_info
+Combien il reste à payer ?;demande_info
+c'est quoi cette référence ?;demande_info
+Merci de m'appeler pour en discuter;demande_info
+Qui dois-je contacter pour la comptabilité ?;demande_info
+Vous acceptez Wave ?;demande_info
+La facture date de quand ?;demande_info
+Je ne retrouve pas la facture renvoyez la;demande_info
+C'est pour la livraison de quel mois ?;demande_info
+Bonjour;sans_rapport
+Ok;sans_rapport
+Merci;sans_rapport
+Bonne année à vous;sans_rapport
+Stop;sans_rapport
+Qui est-ce ?;sans_rapport
+Mauvais numéro;sans_rapport
+Je ne suis plus le gérant de cette boutique;sans_rapport
+Bonne fête de fin d'année;sans_rapport
+Ne m'écrivez plus sur ce numéro;sans_rapport
+Vous avez des promotions ce mois ?;sans_rapport
+Je veux commander 20 cartons de lait;sans_rapport
+Amen;sans_rapport
+Dieu merci;sans_rapport
+C'est noté;sans_rapport
+Je suis en voyage;sans_rapport
+Désolé je suis occupé;sans_rapport
+Quel est votre prix pour le riz ?;sans_rapport
+Envoyez-moi votre catalogue;sans_rapport
+La famille va bien merci;sans_rapport
+Bonjour vous livrez à Porto-Novo ?;sans_rapport
+erreur de destinataire;sans_rapport
+Je ne connais pas cette entreprise;sans_rapport
+Félicitations pour votre nouvelle boutique;sans_rapport
+Bonne arrivée;sans_rapport

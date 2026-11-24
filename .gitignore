@@ -17,6 +17,7 @@ data/sortants/
 # Secrets
 .env
 .env.*
+!.env.exemple
 
 # Frontend
 node_modules/

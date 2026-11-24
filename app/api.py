@@ -25,7 +25,7 @@ from app import (audit, auth, demo, fiche, importer, journal, parametres, priori
                  reponses, resolution, statuts, tableau_bord, validation)
 from app.db import connecter, version_schema
 from app.erreurs import ErreurMetier
-from app.montants import depuis_unites_mineures
+from app.montants import depuis_unites_mineures, formater
 from app.normalisation import ErreurValeur, lire_decimal, lire_montant
 
 app = FastAPI(title="Recouvrement BWAI", version="0.2.0")
@@ -310,7 +310,8 @@ def detail_facture(facture_id: int, conn: sqlite3.Connection = Depends(base), u:
     e = moteur.etat(conn, facture_id)
     if e is None:
         raise ErreurApi(404, "INTROUVABLE", "Facture introuvable")
-    paiements = [dict(p) for p in conn.execute(
+    paiements = [_masquer(u, dict(p) | {"montant_affiche": formater(p["montant"], p["devise"], e.decimales)},
+                          "telephone_payeur") for p in conn.execute(
         "SELECT * FROM paiements WHERE facture_id = ? OR facture_proposee_id = ? ORDER BY date_paiement, id",
         (facture_id, facture_id))]
     avoirs = [dict(a) for a in conn.execute("SELECT * FROM avoirs WHERE facture_id = ? ORDER BY id", (facture_id,))]
@@ -391,7 +392,9 @@ def lister_paiements(statut: str | None = None, conn: sqlite3.Connection = Depen
     sql, params = "SELECT * FROM paiements", ()
     if statut:
         sql, params = sql + " WHERE statut_rapprochement = ?", (statut,)
-    return [_masquer(u, dict(p), "telephone_payeur") for p in conn.execute(sql + " ORDER BY id", params)]
+    decimales = {r["code"]: r["decimales"] for r in conn.execute("SELECT code, decimales FROM devises")}
+    return [_masquer(u, dict(p) | {"montant_affiche": formater(p["montant"], p["devise"], decimales[p["devise"]])},
+                     "telephone_payeur") for p in conn.execute(sql + " ORDER BY id", params)]
 
 
 @app.post("/api/rapprochement")
@@ -628,8 +631,21 @@ def arret_urgence(corps: ArretUrgence, conn: sqlite3.Connection = Depends(base),
 @app.get("/api/etat-systeme")
 def etat_systeme(conn: sqlite3.Connection = Depends(base), u: dict = Depends(utilisateur)) -> dict:
     compte = {r["statut"]: r["n"] for r in conn.execute("SELECT statut, count(*) AS n FROM relances GROUP BY statut")}
+    un = lambda sql: conn.execute(sql).fetchone()[0]  # noqa: E731
     return {"date_du_jour": parametres.date_du_jour(conn).isoformat(),
+            "date_simulee": parametres.lire(conn, "date_du_jour_simulee") is not None,
             "arret_urgence": parametres.lire(conn, "arret_urgence"), "ia_active": parametres.lire(conn, "ia_active"),
+            "entreprise": parametres.lire(conn, "entreprise")["nom"],
+            "a_traiter": {
+                "lots_a_valider": un("SELECT count(DISTINCT lot_envoi) FROM relances WHERE statut = 'a_valider'"),
+                "lots_a_envoyer": un("SELECT count(DISTINCT lot_envoi) FROM relances WHERE statut = 'validee'"),
+                "paiements_a_valider": un("SELECT count(*) FROM paiements WHERE statut_rapprochement = 'a_valider'"),
+                "anomalies_ouvertes": un("SELECT count(*) FROM import_anomalies WHERE gravite = 'rejet'"
+                                         " AND resolution IS NULL"),
+                "factures_a_verifier": un("SELECT count(*) FROM factures WHERE a_verifier = 1"),
+                "relances_en_echec": un("SELECT count(DISTINCT lot_envoi) FROM relances WHERE statut = 'echec'"),
+            },
+            "factures": un("SELECT count(*) FROM factures"),
             "relances": compte, "verrous": [dict(v) for v in conn.execute("SELECT nom, acquis_le, expire_le FROM verrous")]}
 
 

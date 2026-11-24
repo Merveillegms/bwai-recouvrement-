@@ -10,16 +10,23 @@ chacune de ses décisions.
 ## Prérequis
 
 - Python 3.10 ou plus récent
-- Node.js 20+ (pour l'interface, à venir)
+- Node.js 20+ (interface)
 
 ## Démarrage
 
 ```bash
-python tasks.py init    # environnement, base SQLite, jeu de données de démo
+python tasks.py init    # Python + interface (npm ci, build), base SQLite, jeu de données de démo
 python tasks.py test    # tests
-python tasks.py demo    # API sur http://127.0.0.1:8000 (docs : /docs)
+python tasks.py demo    # interface http://127.0.0.1:3000 + API http://127.0.0.1:8000/docs
 python tasks.py reset   # remet base et données à zéro
 ```
+
+## Interface
+
+Registre de recouvrement (Next.js, sans dépendance réseau : polices embarquées). Écrans : Aujourd'hui (file
+priorisée et expliquée), Validation et envoi, Paiements à rapprocher, Factures (fiche, frise, actions),
+Import (correspondance de colonnes, anomalies), Journal, Tableau de bord, Réglages (arrêt d'urgence, poids,
+démonstration). Le frontend ne calcule rien : tout vient de l'API.
 
 ## Démonstration (API)
 

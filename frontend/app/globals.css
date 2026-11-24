@@ -1,0 +1,68 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Registre comptable : un grand livre de recouvrement.
+   Papier crème, encre bleu nuit, filets fins ; le rouge « tampon » est réservé à ce qui exige une décision. */
+:root {
+  --papier: #f3efe3;
+  --papier-fonce: #e9e3d3;
+  --encre: #1b2a41;
+  --encre-pale: #52607a;
+  --filet: #c9bfa8;
+  --lavis: #dfe6f0;
+  --tampon: #a8322b;
+  --ok: #2f6b4f;
+  --alerte: #8a5a0b;
+  color-scheme: light;
+}
+
+html, body { height: 100%; }
+body {
+  background: var(--papier);
+  color: var(--encre);
+  font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  padding-left: max(0px, env(safe-area-inset-left, 0px));
+  padding-right: max(0px, env(safe-area-inset-right, 0px));
+}
+
+h1, h2, h3 { font-family: Spectral, Georgia, serif; text-wrap: balance; }
+.chiffres { font-family: "IBM Plex Mono", Consolas, monospace; font-variant-numeric: tabular-nums; }
+
+:focus-visible { outline: 2px solid var(--encre); outline-offset: 2px; }
+
+@layer components {
+  /* Page de registre : lignes réglées comme un cahier comptable. */
+  .registre { background-image: repeating-linear-gradient(to bottom, transparent 0 calc(3.75rem - 1px), var(--filet) calc(3.75rem - 1px) 3.75rem); }
+
+  /* Tampon encré : un état qui demande une attention humaine. */
+  .tampon {
+    display: inline-block; border: 2px solid currentColor; padding: 0 0.4rem; font-size: 0.66rem; font-weight: 600;
+    letter-spacing: 0.14em; text-transform: uppercase; transform: rotate(-2.5deg); line-height: 1.35;
+  }
+
+  .etiquette { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--encre-pale); }
+
+  .bouton {
+    display: inline-flex; align-items: center; gap: 0.4rem; border: 1.5px solid var(--encre); background: var(--encre);
+    color: var(--papier); padding: 0.4rem 0.9rem; font-size: 0.88rem; font-weight: 500; cursor: pointer;
+    transition: opacity .15s;
+  }
+  .bouton:disabled { opacity: .45; cursor: progress; }
+  .bouton-second { background: transparent; color: var(--encre); }
+  .bouton-danger { background: transparent; color: var(--tampon); border-color: var(--tampon); }
+
+  .champ {
+    border: 1px solid var(--filet); background: #fbf9f3; padding: 0.35rem 0.55rem; font: inherit; color: var(--encre);
+    min-width: 0;
+  }
+  .champ:focus { outline: 2px solid var(--encre); outline-offset: 0; }
+
+  .filet-double { border-bottom: 3px double var(--encre); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { transition: none !important; animation: none !important; }
+}

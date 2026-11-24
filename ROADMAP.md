@@ -149,18 +149,17 @@
 
 ---
 
-## Partie B — Front-end (après la phase 5)
+## Partie B — Front-end ✅ (24/11)
 
-> Identité distinctive mais sobre, sans landing page. Je te proposerai 2 ou 3 pistes visuelles à choisir avant de coder.
+> Piste retenue : **Registre comptable** (papier, encre, filets, tampons), sans landing page.
 
-- [ ] Client d'API typé généré depuis l'OpenAPI
-- [ ] Pages : import (+ correspondance de colonnes, rapport), file « Aujourd'hui », file de validation, fiche facture avec frise, journal, tableau de bord, paramètres
-- [ ] Boutons désactivés pendant l'appel + clé d'idempotence envoyée à chaque action
-- [ ] Rôles visibles (gestionnaire / validateur / auditeur)
-- [ ] Contrôle de l'horloge simulée pour la démo
-- [ ] `demo` lance API + front ensemble
-
----
+- [x] Next.js + TypeScript + Tailwind ; polices embarquées (fonctionne sans internet) ; proxy `/api` vers FastAPI
+- [x] Types générés depuis l'OpenAPI (`npm run types`) + types des réponses
+- [x] Pages : connexion, Aujourd'hui, validation et envoi, paiements, factures + fiche avec frise, import (correspondance, rapport, anomalies), journal, tableau de bord, réglages
+- [x] Boutons désactivés pendant l'appel + clé d'idempotence envoyée à chaque action
+- [x] Rôles visibles (gestionnaire / validateur / auditeur) ; décisions masquées selon le rôle
+- [x] Contrôles de démo : charger le jeu, avancer l'horloge, simuler un paiement, exécuter la file
+- [x] `python tasks.py demo` lance API + interface ensemble
 
 ## Partie C — Tests, mesures, livrables
 

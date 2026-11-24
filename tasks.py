@@ -5,6 +5,11 @@
     python tasks.py test    lance les tests
     python tasks.py demo    lance l'API (port 8000) et l'interface (http://127.0.0.1:3000)
     python tasks.py reset   remet la base et les données de démo à zéro
+
+    python tasks.py sauvegarder           copie cohérente de la base dans data/sauvegardes/
+    python tasks.py restaurer <fichier>   vérifie puis restaure une copie (l'ancienne base est conservée)
+    python tasks.py couverture            tests + rapport de couverture (docs/couverture.txt)
+    python tasks.py mesurer               gains, charge 10 000 factures, évaluation IA, licences (docs/)
 """
 from __future__ import annotations
 
@@ -93,7 +98,39 @@ def reset() -> None:
     _lancer(PYTHON, "-m", "app.cli", "reset")
 
 
-COMMANDES = {"init": init, "test": test, "demo": demo, "reset": reset}
+def sauvegarder() -> None:
+    _verifier_environnement()
+    _lancer(PYTHON, "-m", "app.sauvegarde", "sauvegarder")
+
+
+def restaurer() -> None:
+    _verifier_environnement()
+    if len(sys.argv) < 3:
+        sys.exit("Usage : python tasks.py restaurer data/sauvegardes/<fichier>.db")
+    _lancer(PYTHON, "-m", "app.sauvegarde", "restaurer", sys.argv[2])
+
+
+def couverture() -> None:
+    """Tests + rapport de couverture versionné (docs/couverture.txt)."""
+    _verifier_environnement()
+    sortie = RACINE / "docs" / "couverture.txt"
+    with sortie.open("w", encoding="utf-8") as f:
+        r = subprocess.run([str(PYTHON), "-m", "pytest", "-p", "no:warnings", "--cov=app", "--cov-report=term-missing:skip-covered"],
+                           cwd=RACINE, env=ENV, stdout=f, stderr=subprocess.STDOUT)
+    print(sortie.read_text(encoding="utf-8").splitlines()[-1])
+    if r.returncode:
+        sys.exit(r.returncode)
+
+
+def mesurer() -> None:
+    """Mesures du rapport : gains face à la référence, charge 10 000 factures, évaluation de l'IA, licences."""
+    _verifier_environnement()
+    for module in ("app.mesure_gains", "app.charge", "app.ia.evaluation", "app.licences"):
+        _lancer(PYTHON, "-m", module)
+
+
+COMMANDES = {"init": init, "test": test, "demo": demo, "reset": reset, "sauvegarder": sauvegarder,
+             "restaurer": restaurer, "couverture": couverture, "mesurer": mesurer}
 
 if __name__ == "__main__":
     if len(sys.argv) < 2 or sys.argv[1] not in COMMANDES:

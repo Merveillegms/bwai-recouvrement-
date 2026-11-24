@@ -161,27 +161,28 @@
 - [x] Aucun calcul côté interface (montants et points du score fournis par l'API) ; clé d'idempotence à chaque action
 - [x] `python tasks.py demo` lance API + interface
 
-## Partie C — Tests, mesures, livrables
+## Partie C · Tests, mesures, livrables ✅ (24/11)
 
 ### Tests et robustesse
-- [ ] Pyramide : unitaires · intégration · bout en bout · robustesse (interruption, double clic, concurrence, fichier corrompu) · sécurité · IA
-- [ ] Rapport de couverture dans le dépôt
-- [ ] 10 000 factures : temps d'import et de calcul mesurés
-- [ ] Sauvegarde / restauration en une commande
-- [ ] Aucun secret dans le dépôt ; licences des dépendances déclarées
+- [x] Pyramide : unitaires · intégration · bout en bout · robustesse (coupure réelle, double clic, concurrence, fichier corrompu, panne fournisseur) · sécurité · IA ; 305 tests
+- [x] Rapport de couverture dans le dépôt (`docs/couverture.txt`, 90 %)
+- [x] 10 000 factures : 8,5 s pour tout le parcours (`docs/performance.json`) ; import ramené de 326 s à 2,2 s
+- [x] Sauvegarde / restauration vérifiée en une commande
+- [x] Aucun secret dans le dépôt ; licences des dépendances déclarées (`docs/licences.md`)
 
 ### Mesure des gains
-- [ ] Protocole : 50 factures traitées à la main puis avec l'outil, chronométrées
-- [ ] Erreurs comptées : facture payée relancée, doublon, mauvaise priorité, mauvais montant, relance oubliée
-- [ ] Tableau « manuel / outil » + coût de fonctionnement
+- [x] Comparatif mesuré face à une relance naïve (`docs/mesure_gains.md`) : 0 erreur pour l'outil, 3,6 fois plus de montant traité la première heure, 24 messages au lieu de 90
+- [x] Protocole de chronométrage réel (`docs/protocole_mesure.md`) ; temps humains encore estimés
+- [ ] Chronométrage réel avec un testeur (à faire par l'équipe)
 
 ### Livrables
-- [ ] **Prototype** : `init` + `demo`, `reset`, reprise démontrée, testé sur une autre machine
-- [ ] **Code source** : dépôt accessible, tag de rendu, licences
-- [ ] **README** : présentation, installation, lancement, comptes de test, scénario de démo, tests, limites
-- [ ] **Rapport (3-5 pages)** : besoin, architecture, règles métier, garde-fous, tests et gains, limites et coûts
-- [ ] **Fiche IA** : modèle, données envoyées, évaluation, seuils de revue, mode sans IA
-- [ ] **Vidéo (2-3 min)** : problème → import et anomalies → priorisation → relance et validation humaine → coupure / reprise → chiffres et journal
+- [x] **Prototype** : `init` + `demo`, `reset`, reprise démontrée
+- [x] **README** final
+- [x] **Rapport** : [docs/rapport.md](docs/rapport.md)
+- [x] **Fiche IA** : [docs/fiche_ia.md](docs/fiche_ia.md)
+- [x] **Scénario vidéo** : [docs/video.md](docs/video.md)
+- [ ] **Vidéo** enregistrée (équipe)
+- [ ] Test sur une autre machine, puis tag de rendu
 
 ---
 

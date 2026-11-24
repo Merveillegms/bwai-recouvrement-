@@ -10,6 +10,7 @@ Règles : docs/regles_metier.md § 6.
 from __future__ import annotations
 
 import csv
+from collections import defaultdict
 import hashlib
 import io
 import json
@@ -247,34 +248,40 @@ def _traiter_factures(conn, import_id, lignes, auteur) -> tuple[list[Anomalie], 
 
     # Passe 2 : avertissements (la ligne entre, marquée « à vérifier »).
     clients = {r["code"]: r for r in conn.execute("SELECT id, code, statut_validation FROM clients")}
-    for i, f in enumerate(candidates):
+    # Chaque contrôle compare une facture aux seules factures du même client et de la même devise :
+    # le temps reste proportionnel au nombre de lignes (10 000 factures importées en quelques secondes).
+    groupes: dict[tuple[str, str], list[_FactureLue]] = defaultdict(list)
+    for f in candidates:
+        groupes[(f.code_client, f.devise)].append(f)
+    cache_base: dict[tuple[int, str], list] = {}
+
+    def en_base(client_id: int, devise: str) -> list:
+        if (client_id, devise) not in cache_base:
+            cache_base[(client_id, devise)] = conn.execute(
+                "SELECT numero, date_emission, montant_ttc FROM factures WHERE client_id = ? AND devise = ?"
+                " AND statut <> 'cloturee'", (client_id, devise)).fetchall()
+        return cache_base[(client_id, devise)]
+
+    for f in candidates:
         client = clients.get(f.code_client)
+        groupe = groupes[(f.code_client, f.devise)]
+        base = en_base(client["id"], f.devise) if client is not None else []
         if client is None or client["statut_validation"] == "en_attente":
             f.avertissements.append(Anomalie(f.ligne, "avertissement", "CLIENT_INCONNU",
                                              f"Client {f.code_client} inconnu : créé en attente de validation", f.brut))
         if f.echeance < f.emission:
             f.avertissements.append(Anomalie(f.ligne, "avertissement", "ECHEANCE_AVANT_EMISSION",
                                              f"Échéance {f.echeance} antérieure à l'émission {f.emission}", f.brut))
-        similaire = next((g for g in candidates[:i]
-                          if g.code_client == f.code_client and g.devise == f.devise and g.montant == f.montant
+        similaire = next((g for g in groupe if g.ligne < f.ligne and g.montant == f.montant
                           and abs((g.emission - f.emission).days) <= fenetre), None)
-        if similaire is None and client is not None:
-            for r in conn.execute(
-                "SELECT numero, date_emission FROM factures WHERE client_id = ? AND devise = ? AND montant_ttc = ?"
-                " AND statut <> 'cloturee'", (client["id"], f.devise, f.montant)
-            ):
-                if abs((date.fromisoformat(r["date_emission"]) - f.emission).days) <= fenetre:
-                    similaire = r
-                    break
+        if similaire is None:
+            similaire = next((r for r in base if r["montant_ttc"] == f.montant
+                              and abs((date.fromisoformat(r["date_emission"]) - f.emission).days) <= fenetre), None)
         if similaire is not None:
             autre = similaire.numero if isinstance(similaire, _FactureLue) else similaire["numero"]
             f.avertissements.append(Anomalie(f.ligne, "avertissement", "QUASI_DOUBLON",
                                              f"Même client, même montant et date proche que la facture {autre}", f.brut))
-        autres = [g.montant for g in candidates if g is not f and g.code_client == f.code_client and g.devise == f.devise]
-        if client is not None:
-            autres += [r[0] for r in conn.execute(
-                "SELECT montant_ttc FROM factures WHERE client_id = ? AND devise = ? AND statut <> 'cloturee'",
-                (client["id"], f.devise))]
+        autres = [g.montant for g in groupe if g is not f] + [r["montant_ttc"] for r in base]
         if len(autres) >= minimum and f.montant > facteur * _mediane(autres):
             f.avertissements.append(Anomalie(f.ligne, "avertissement", "MONTANT_ABERRANT",
                                              f"Montant plus de {facteur} fois supérieur à l'habitude de ce client", f.brut))

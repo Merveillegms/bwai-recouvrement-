@@ -1,0 +1,19 @@
+{
+  "factures": 10000,
+  "paiements": 3424,
+  "acceptees": 10000,
+  "rapprochements": 3424,
+  "file_du_jour": 6280,
+  "exclues": 3720,
+  "relances_preparees": 6280,
+  "temps_s": {
+    "import_clients_s": 0.07,
+    "import_factures_s": 2.19,
+    "import_paiements_s": 0.52,
+    "rapprochement_s": 1.87,
+    "file_du_jour_s": 0.73,
+    "preparation_relances_s": 3.07
+  },
+  "total_s": 8.45,
+  "taille_base_mo": 32.8
+}

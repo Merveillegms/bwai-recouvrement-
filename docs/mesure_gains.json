@@ -1,0 +1,51 @@
+{
+  "date_reference": "2026-12-15",
+  "jeu": "factures_lot1.csv (128 lignes piégées) + paiements mobile money",
+  "hypotheses_minutes": {
+    "manuel_par_relance": 3.0,
+    "outil_lancement": 2.0,
+    "outil_par_lot_a_valider": 0.5
+  },
+  "delai_suivi_paiements_jours": 7,
+  "capacite_premiere_heure": 20,
+  "reference_naive": {
+    "relances": 90,
+    "messages": 90,
+    "lignes_ignorees_sans_alerte": 2,
+    "erreurs": {
+      "litiges_relances": 3,
+      "donnees_douteuses_relancees": 4,
+      "relances_impossibles": 3,
+      "lignes_invalides_relancees": 11,
+      "factures_payees_relancees": 1,
+      "doublons_relances": 2,
+      "paiement_recu_non_rapproche_relance": 2,
+      "messages_en_trop_le_meme_jour": 73,
+      "anomalies_non_signalees": 19
+    },
+    "du_traite_premiere_heure_fcfa": 8704500
+  },
+  "outil": {
+    "relances": 65,
+    "messages": 24,
+    "lots_a_valider": 22,
+    "anomalies_signalees": 19,
+    "erreurs": {
+      "doublons_relances": 0,
+      "montants_faux": 0,
+      "messages_en_trop_le_meme_jour": 0
+    },
+    "chronos": {
+      "import_s": 0.043,
+      "rapprochement_s": 0.02,
+      "priorisation_s": 0.009,
+      "preparation_s": 0.022
+    },
+    "du_traite_premiere_heure_fcfa": 31563000
+  },
+  "temps": {
+    "manuel_min": 270.0,
+    "outil_min": 13.0,
+    "gain_pct": 95.2
+  }
+}

@@ -134,8 +134,9 @@ def preparer(conn: sqlite3.Connection, auteur: str = "systeme") -> dict:
                      "; ".join(raisons) or None, texte, e.version, e.solde, lot, jour)).lastrowid
                 journal.ajouter(conn, acteur=auteur, type_acteur="systeme", action="preparation_relance",
                                 objet_type="relance", objet_id=rid,
-                                apres={"facture_id": e.id, "etape": p.etape["etape"], "canal": canal, "lot": lot,
-                                       "statut": statut, "solde": e.solde, "raisons": raisons},
+                                apres={"facture_id": e.id, "numero": e.numero, "etape": p.etape["etape"], "canal": canal,
+                                       "lot": lot, "statut": statut, "solde": e.solde, "score": str(p.score),
+                                       "explication": p.explication, "raisons": raisons},
                                 regle=f"SEQUENCE_{p.etape['etape']}" + ("+VALIDATION_HUMAINE" if validation else ""))
                 resume["relances"] += 1
                 resume["a_valider" if validation else "validees"] += 1

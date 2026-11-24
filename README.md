@@ -21,6 +21,17 @@ python tasks.py demo    # API sur http://127.0.0.1:8000 (docs : /docs)
 python tasks.py reset   # remet base et données à zéro
 ```
 
+## Démonstration (API)
+
+Une fois connecté (voir comptes ci-dessous), depuis http://127.0.0.1:8000/docs :
+
+1. `POST /api/demo/charger` : importe le jeu piégé au 15/12/2026 (rapports d'import, rapprochement) ;
+2. `GET /api/aujourdhui` : file du jour priorisée et expliquée ;
+3. `POST /api/relances/preparer` puis `GET /api/validation` : lots à valider (compte validateur) ;
+4. `POST /api/relances/envoyer` : envoi simulé (`data/sortants/`) ;
+5. `POST /api/demo/paiement` et `POST /api/demo/avancer` : un client paie, le temps passe ;
+6. `GET /api/tableau-de-bord`, `GET /api/journal`, `GET /api/factures/{id}/frise` : preuve et traçabilité.
+
 ## Comptes de test
 
 Connexion : `POST /api/auth/connexion` puis en-tête `Authorization: Bearer <jeton>`.

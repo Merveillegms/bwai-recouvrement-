@@ -238,3 +238,43 @@ def test_validation_et_arret_urgence_par_l_api(client):
     assert client.get("/api/etat-systeme").json()["arret_urgence"] is True
     client.post("/api/arret-urgence", json={"actif": False}, headers=validateur)
     assert client.post("/api/relances/envoyer").json()["envoyes"] > 0
+
+
+def test_audit_tableau_de_bord_et_demo_par_l_api(client):
+    import os
+    from app import parametres
+    from app.db import connecter
+    conn = connecter(os.environ["RECOUVREMENT_DB"])
+    parametres.ecrire(conn, "date_du_jour_simulee", None, "test")
+    conn.close()
+    assert client.post("/api/demo/avancer", json={"jours": 1}).json()["code"] == "MODE_REEL"
+    charge = client.post("/api/demo/charger")
+    assert charge.status_code == 200 and charge.json()["date"] == "2026-12-15"
+    assert client.post("/api/demo/charger").status_code == 409
+    assert client.post("/api/demo/charger", headers=_en_tant_que(client, "auditeur")).status_code == 403
+    execution = client.post("/api/demo/executer").json()
+    assert execution["preparation"]["relances"] > 0
+
+    j = client.get("/api/journal?action=creation_facture&limite=5").json()
+    assert j["total"] > 100 and len(j["lignes"]) == 5 and j["lignes"][0]["libelle"].startswith("Facture importée")
+    assert client.get("/api/journal/verification").json()["intact"] is True
+    export = client.get("/api/journal/export.csv?action=connexion")
+    assert export.status_code == 200 and export.content.decode("utf-8-sig").startswith("id;horodatage")
+
+    relance = client.get("/api/relances/lots").json()[0]["relances"][0]
+    frise = client.get(f"/api/factures/{relance['facture_id']}/frise").json()
+    assert frise["evenements"][0]["action"] == "creation_facture"
+    explication = client.get(f"/api/relances/{relance['id']}/explication").json()
+    assert explication["pourquoi"].startswith("Priorité")
+    assert client.get("/api/relances/999999/explication").status_code == 404
+
+    paye = client.post("/api/demo/paiement", json={"facture_id": relance["facture_id"], "montant": "1 000"})
+    assert paye.status_code == 200 and paye.json()["rapprochement"] == {"RAPPROCHE": 1}
+    avance = client.post("/api/demo/avancer", json={"jours": 7}).json()
+    assert avance["date"] == "2026-12-22"
+
+    tdb = client.get("/api/tableau-de-bord?client=C005").json()
+    assert tdb["filtres"]["client"] == "C005" and "total_echu" in tdb["encours"]
+    assert client.get("/api/tableau-de-bord/export.csv").status_code == 200
+    pdf = client.get("/api/tableau-de-bord/export.pdf")
+    assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF")

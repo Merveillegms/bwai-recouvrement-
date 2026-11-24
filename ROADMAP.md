@@ -128,15 +128,15 @@
 **Sortie** : « je tue le programme en pleine file d'envoi, je le relance, aucune relance en double » fonctionne à chaque essai. ✅ Coupures à 0,8 / 1,6 / 2,7 s : cas « tué avant l'envoi » (remis en file) et « tué après l'envoi, avant l'enregistrement » (confirmé sans renvoi) couverts ; 259 tests, couverture 94 %.
 **→ Contrat d'API figé, le front peut démarrer.**
 
-### Phase 6 · Journal, audit, indicateurs (API)
-- [ ] Journal : horodatage, acteur (humain / système / IA), action, objet, avant, après, règle
-- [ ] Trigger SQL qui refuse `UPDATE` / `DELETE` ; chaînage par empreintes + endpoint de vérification
-- [ ] Recherche et export CSV du journal
-- [ ] Historique par facture + « pourquoi cette facture est-elle ici ? »
-- [ ] Indicateurs : total à recouvrer, tranches, top 10, charge de validation, recouvré après relance, délai moyen, promesses tenues, anomalies évitées
-- [ ] Horloge simulée (avancer de N jours), scénario de démo, `reset`
+### Phase 6 · Journal, audit, indicateurs (API) ✅ (24/11)
+- [x] Journal : horodatage, acteur (humain / système / IA), action, objet, avant, après, règle ; explication de priorité enregistrée à la préparation
+- [x] Trigger SQL qui refuse `UPDATE` / `DELETE` ; chaînage par empreintes + endpoint de vérification
+- [x] Recherche (action, acteur, objet, règle, période, facture, client, pagination) et export CSV du journal
+- [x] Frise par facture en phrases lisibles + « pourquoi cette facture est-elle ici ? » + explication d'une relance
+- [x] Indicateurs : encours dû / échu, tranches, top 10, charge de validation, recouvré après relance, délai moyen par étape, promesses tenues, valeur des garde-fous ; filtres ; export CSV et PDF
+- [x] Mode démo : charger le jeu, avancer l'horloge de N jours, simuler un paiement client, exécuter la file ; `python tasks.py reset`
 
-**Sortie** : à partir du seul journal, on explique chaque relance envoyée, bloquée ou annulée.
+**Sortie** : à partir du seul journal, on explique chaque relance envoyée, bloquée ou annulée. ✅ Prouvé en copiant **uniquement** la table `journal` dans une base vide : le sort de chaque relance (envoyée, annulée avant envoi, rejetée, suspendue, en attente) est reconstitué à l'identique ; 268 tests, couverture 94 %.
 
 ### Phase 7 · IA encadrée (bonus, désactivable)
 - [ ] Rédaction : reçoit des champs calculés + gabarit ; valeurs sensibles injectées après génération via marqueurs ; repli sur gabarit fixe

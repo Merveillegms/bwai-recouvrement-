@@ -21,8 +21,8 @@ from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
 from app import etat as moteur
-from app import (auth, fiche, importer, parametres, priorisation, rapprochement, relances, reponses, resolution,
-                 statuts, validation)
+from app import (audit, auth, demo, fiche, importer, journal, parametres, priorisation, rapprochement, relances,
+                 reponses, resolution, statuts, tableau_bord, validation)
 from app.db import connecter, version_schema
 from app.erreurs import ErreurMetier
 from app.montants import depuis_unites_mineures
@@ -52,7 +52,7 @@ def _import_refuse(_: Request, e: importer.ImportRefuse) -> JSONResponse:
 _STATUTS_ERREURS = {"INTROUVABLE": 404, "DEJA_RESOLUE": 409, "DEJA_CLOTUREE": 409, "FACTURE_ENGAGEE": 409,
                     "CLIENT_EN_ATTENTE": 409, "TRANSITION_INTERDITE": 409, "DECISION_HUMAINE_REQUISE": 409,
                     "NON_APPLICABLE": 409, "ARRET_URGENCE": 423, "HORS_PLAGE_HORAIRE": 409,
-                    "TRAITEMENT_EN_COURS": 409, "IDENTIFIANTS_INVALIDES": 401, "VALIDATEUR_REQUIS": 403}
+                    "TRAITEMENT_EN_COURS": 409, "IDENTIFIANTS_INVALIDES": 401, "VALIDATEUR_REQUIS": 403, "DEJA_CHARGE": 409, "MODE_REEL": 409}
 
 
 @app.exception_handler(ErreurMetier)
@@ -631,3 +631,124 @@ def etat_systeme(conn: sqlite3.Connection = Depends(base), u: dict = Depends(uti
     return {"date_du_jour": parametres.date_du_jour(conn).isoformat(),
             "arret_urgence": parametres.lire(conn, "arret_urgence"), "ia_active": parametres.lire(conn, "ia_active"),
             "relances": compte, "verrous": [dict(v) for v in conn.execute("SELECT nom, acquis_le, expire_le FROM verrous")]}
+
+
+# ------------------------------------------------------------------ journal et audit
+def _filtres_journal(action: str | None = None, acteur: str | None = None, type_acteur: str | None = None,
+                     objet_type: str | None = None, objet_id: str | None = None, regle: str | None = None,
+                     depuis: str | None = None, jusqu_a: str | None = None, facture_id: int | None = None,
+                     client: str | None = None) -> dict:
+    return {"action": action, "acteur": acteur, "type_acteur": type_acteur, "objet_type": objet_type,
+            "objet_id": objet_id, "regle": regle, "depuis": depuis, "jusqu_a": jusqu_a, "facture_id": facture_id,
+            "client_code": client}
+
+
+@app.get("/api/journal")
+def journal_rechercher(filtres: dict = Depends(_filtres_journal), limite: int = 100, decalage: int = 0,
+                       conn: sqlite3.Connection = Depends(base), u: dict = Depends(utilisateur)) -> dict:
+    total, lignes = audit.rechercher(conn, **filtres, limite=limite, decalage=decalage)
+    return {"total": total, "lignes": [l | {"libelle": audit.libelle(l)} for l in lignes]}
+
+
+@app.get("/api/journal/export.csv")
+def journal_export(filtres: dict = Depends(_filtres_journal), conn: sqlite3.Connection = Depends(base),
+                   u: dict = Depends(utilisateur)) -> Response:
+    _, lignes = audit.rechercher(conn, **filtres, limite=5000)
+    return Response(audit.exporter_csv(lignes), media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": 'attachment; filename="journal.csv"'})
+
+
+@app.get("/api/journal/verification")
+def journal_verification(conn: sqlite3.Connection = Depends(base), u: dict = Depends(utilisateur)) -> dict:
+    """Vérifie le chaînage des empreintes : toute modification ou suppression est détectée."""
+    anomalies = journal.verifier_chaine(conn)
+    total = conn.execute("SELECT count(*) FROM journal").fetchone()[0]
+    return {"intact": not anomalies, "lignes_verifiees": total, "lignes_alterees": anomalies}
+
+
+@app.get("/api/factures/{facture_id}/frise")
+def frise_facture(facture_id: int, conn: sqlite3.Connection = Depends(base), u: dict = Depends(utilisateur)) -> dict:
+    e = moteur.etat(conn, facture_id)
+    if e is None:
+        raise ErreurApi(404, "INTROUVABLE", "Facture introuvable")
+    return {"facture": e.en_dict(), "evenements": audit.frise(conn, facture_id)}
+
+
+@app.get("/api/relances/{relance_id}/explication")
+def explication_relance(relance_id: int, conn: sqlite3.Connection = Depends(base),
+                        u: dict = Depends(utilisateur)) -> dict:
+    resultat = audit.expliquer_relance(conn, relance_id)
+    if not resultat["trouvee"]:
+        raise ErreurApi(404, "INTROUVABLE", "Relance introuvable dans le journal")
+    return resultat
+
+
+# ------------------------------------------------------------------- tableau de bord
+def _filtres_tableau(debut: str | None = None, fin: str | None = None, client: str | None = None,
+                     tranche: str | None = None) -> dict:
+    return {"debut": debut, "fin": fin, "client": client, "tranche": tranche}
+
+
+@app.get("/api/tableau-de-bord")
+def tableau_de_bord(filtres: dict = Depends(_filtres_tableau), conn: sqlite3.Connection = Depends(base),
+                    u: dict = Depends(utilisateur)) -> dict:
+    return tableau_bord.indicateurs(conn, **filtres)
+
+
+@app.get("/api/tableau-de-bord/export.csv")
+def tableau_de_bord_csv(filtres: dict = Depends(_filtres_tableau), conn: sqlite3.Connection = Depends(base),
+                        u: dict = Depends(utilisateur)) -> Response:
+    return Response(tableau_bord.exporter_csv(tableau_bord.indicateurs(conn, **filtres)),
+                    media_type="text/csv; charset=utf-8",
+                    headers={"Content-Disposition": 'attachment; filename="tableau_de_bord.csv"'})
+
+
+@app.get("/api/tableau-de-bord/export.pdf")
+def tableau_de_bord_pdf(filtres: dict = Depends(_filtres_tableau), conn: sqlite3.Connection = Depends(base),
+                        u: dict = Depends(utilisateur)) -> Response:
+    pdf = tableau_bord.exporter_pdf(tableau_bord.indicateurs(conn, **filtres), parametres.lire(conn, "entreprise")["nom"])
+    return Response(pdf, media_type="application/pdf",
+                    headers={"Content-Disposition": 'inline; filename="tableau_de_bord.pdf"'})
+
+
+# ------------------------------------------------------------------- démonstration
+class Jours(BaseModel):
+    jours: int
+
+
+class PaiementDemo(BaseModel):
+    facture_id: int
+    montant: str | None = None
+
+
+@app.post("/api/demo/charger")
+def demo_charger(conn: sqlite3.Connection = Depends(base), u: dict = Depends(utilisateur)) -> dict:
+    _ecriture_autorisee(u)
+    return demo.charger(conn, u["identifiant"])
+
+
+@app.post("/api/demo/avancer")
+def demo_avancer(corps: Jours, conn: sqlite3.Connection = Depends(base), u: dict = Depends(utilisateur)) -> dict:
+    _ecriture_autorisee(u)
+    return demo.avancer(conn, corps.jours, u["identifiant"])
+
+
+@app.post("/api/demo/paiement")
+def demo_paiement(corps: PaiementDemo, conn: sqlite3.Connection = Depends(base), u: dict = Depends(utilisateur)) -> dict:
+    _ecriture_autorisee(u)
+    montant = None
+    if corps.montant:
+        e = moteur.etat(conn, corps.facture_id)
+        if e is None:
+            raise ErreurApi(404, "INTROUVABLE", "Facture introuvable")
+        try:
+            montant = lire_montant(corps.montant, e.decimales)
+        except ErreurValeur as err:
+            raise ErreurApi(422, err.code, err.message) from None
+    return demo.payer(conn, corps.facture_id, u["identifiant"], montant)
+
+
+@app.post("/api/demo/executer")
+def demo_executer(conn: sqlite3.Connection = Depends(base), u: dict = Depends(utilisateur)) -> dict:
+    _ecriture_autorisee(u)
+    return demo.executer(conn, u["identifiant"])

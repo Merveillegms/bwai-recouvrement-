@@ -100,13 +100,42 @@ est refusé en entier.
 Seuls les montants anormalement **hauts** sont signalés : un petit montant n'est pas un risque de relance
 abusive. **[à valider]**
 
+Autre rejet : `VALEUR_INVALIDE` (colonne litige ou sensible ni « oui » ni « non »).
+
 ### Clients
 
 | Code | Règle |
 |---|---|
 | `CHAMP_MANQUANT` | code ou nom vide → rejet |
-| `DOUBLON_EXACT` | ligne identique déjà lue → rejet |
+| `DOUBLON_EXACT` | ligne identique déjà lue dans le fichier → rejet |
+| `DOUBLON_IMPORT` | client déjà en base, identique → rejet (sans conséquence) |
+| `CONFLIT_CODE` | même code, informations différentes (fichier ou base) → rejet, à corriger à la main |
 | `CANAL_INVALIDE` | canal hors `sms`, `whatsapp`, `email` → rejet |
+
+- Canal vide : WhatsApp si un téléphone est connu, sinon e-mail si une adresse est connue, sinon SMS.
+- Un client créé « en attente » par un import de factures est **complété** (et validé) par un fichier clients.
+
+### Fichier refusé en entier
+
+| Code | Cause |
+|---|---|
+| `FICHIER_DEJA_IMPORTE` | même empreinte SHA-256 qu'un import précédent, même sous un autre nom |
+| `FICHIER_ILLISIBLE` | vide, corrompu, aucun séparateur reconnu |
+| `COLONNES_MANQUANTES` | une colonne obligatoire n'est pas reconnue : correspondance manuelle à fournir |
+| `FICHIER_VIDE` | en-tête sans aucune ligne |
+
+### Compteurs du rapport
+
+`lignes_lues` = `lignes_acceptees` (sans anomalie) + `lignes_avertissement` (entrées, à vérifier) + `lignes_rejetees`.
+
+### Résolution humaine (motif obligatoire sauf mention contraire)
+
+| Situation | Décisions possibles |
+|---|---|
+| `CONFLIT_NUMERO` | **ignorer** la ligne (la base fait foi) ou **remplacer** la facture en base — refusé si un paiement y est rapproché ou une relance envoyée |
+| `DOUBLON_EXACT`, `DOUBLON_IMPORT`, autres rejets | **ignorer** (prise de connaissance, motif facultatif) |
+| Facture à vérifier | **confirmer** (motif facultatif) ou **annuler** : statut `cloturee`, conservée pour l'audit |
+| Client en attente | **valider** la fiche (nom obligatoire) : ses factures dont c'était le seul doute sont libérées |
 
 ## 7. Référence de paiement
 

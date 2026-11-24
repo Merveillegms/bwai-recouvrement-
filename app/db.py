@@ -22,7 +22,9 @@ def connecter(chemin: Path | str | None = None) -> sqlite3.Connection:
     """Ouvre la base en mode autocommit : les transactions sont toujours explicites."""
     chemin = Path(chemin) if chemin else config.chemin_base()
     chemin.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(chemin, isolation_level=None, timeout=10)
+    # check_same_thread=False : FastAPI peut ouvrir la connexion dans un thread et l'utiliser dans un autre.
+    # Chaque requête a sa propre connexion, utilisée en série : pas d'accès concurrent à un même objet.
+    conn = sqlite3.connect(chemin, isolation_level=None, timeout=10, check_same_thread=False)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON")
     conn.execute("PRAGMA journal_mode = WAL")

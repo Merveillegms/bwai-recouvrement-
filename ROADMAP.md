@@ -62,16 +62,18 @@
 
 **Sortie** : `init` + `test` passent sur une machine neuve ; le jeu de données est généré. ✅ (à refaire sur le poste d'un coéquipier)
 
-### Phase 1 · Import et validation
-- [ ] Import CSV / XLSX (factures, clients, paiements), détection encodage et séparateur
-- [ ] Correspondance de colonnes aux noms variables
-- [ ] Empreinte du fichier : refus d'un fichier déjà importé
-- [ ] Import transactionnel (tout ou rien)
-- [ ] Contrôles : champs obligatoires, formats, échéance ≥ émission, devise autorisée, client connu, montant aberrant
-- [ ] Doublons : exact, quasi-doublon, doublon inter-fichiers ; résolution journalisée
-- [ ] Rapport d'import : lues / acceptées / rejetées / avertissements + fichier des rejets avec motif
+### Phase 1 · Import et validation ✅ (24/11)
+- [x] Import CSV / XLSX (factures, clients, paiements), détection encodage (UTF-8, BOM, Windows-1252) et séparateur
+- [x] Correspondance de colonnes par synonymes (accents et casse ignorés) + correspondance manuelle + aperçu sans écriture
+- [x] Empreinte du fichier : refus d'un fichier déjà importé, même renommé (refus journalisé)
+- [x] Import transactionnel (tout ou rien), testé par une panne simulée en plein import
+- [x] Contrôles : champs obligatoires, dates, montants (`1 250 000`, `1250,50`), décimales par devise, échéance ≥ émission, devise, client connu, montant aberrant
+- [x] Doublons : exact, conflit de numéro, quasi-doublon (fichier et base), ré-import inter-fichiers
+- [x] Résolution humaine journalisée : ignorer / remplacer un conflit, confirmer / annuler une facture douteuse, valider un client inconnu
+- [x] Rapport d'import + export CSV des rejets avec motif
+- [x] API : `/api/imports/*`, `/api/anomalies`, `/api/factures/a-verifier`, `/api/clients/{id}/valider` (auditeur en lecture seule)
 
-**Sortie** : chaque anomalie du jeu piégé est détectée, prouvée par un test.
+**Sortie** : chaque anomalie du jeu piégé est détectée, prouvée par un test. ✅ 100 % des lignes conformes à `attendus.json` (clients, 2 lots de factures, paiements) ; 125 tests, couverture 92 %.
 
 ### Phase 2 · Moteur de calcul (fonctions pures)
 - [ ] Solde = TTC − paiements rapprochés − avoirs ; trop-perçu et paiement partiel

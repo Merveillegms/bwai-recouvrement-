@@ -27,6 +27,7 @@ Pygments==2.21.0
 pytest==9.2.0
 pytest-cov==7.1.0
 python-dateutil==3.0.0
+python-multipart==0.0.32
 pytz==2026.6
 six==1.17.0
 sortedcontainers==2.4.0

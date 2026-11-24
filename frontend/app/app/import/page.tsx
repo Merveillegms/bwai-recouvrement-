@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { BoutonAction, DecisionMotivee, EnTetePage, Erreur, Tampon } from "@/components/ui";
+import { BoutonAction, DecisionMotivee, EnTetePage, Erreur } from "@/components/ui";
 import { api, ErreurApi, ouvrirFichier } from "@/lib/api";
 import { useApp, useDonnees } from "@/lib/donnees";
 import { heure } from "@/lib/libelles";
@@ -65,7 +65,7 @@ export default function Import() {
       <EnTetePage titre="Import" sousTitre="CSV ou Excel. Un fichier déjà importé est refusé, même renommé. Rien n'entre à moitié." />
 
       {!lecture && (
-        <section className="grid gap-4 border border-filet bg-[#f8f5ec] p-5">
+        <section className="grid gap-4 carte p-5">
           <div className="flex flex-wrap items-end gap-3">
             <label className="grid gap-1 text-sm" htmlFor="type-import"><span className="etiquette">Contenu du fichier</span>
               <select id="type-import" className="champ" value={type} onChange={(e) => { const t = e.target.value as TypeImport; setType(t); lire(fichier, t); }}>
@@ -79,18 +79,18 @@ export default function Import() {
           {erreur && <Erreur message={erreur} />}
           {apercu && (
             <div className="grid gap-3">
-              <p className="text-sm text-encre-pale">
+              <p className="text-sm text-doux">
                 {apercu.nombre_lignes} lignes · format {apercu.format}
                 {apercu.encodage && <> · encodage {apercu.encodage}</>}
                 {apercu.separateur && <> · séparateur « {apercu.separateur === "\t" ? "tabulation" : apercu.separateur} »</>}
               </p>
-              <div className="overflow-x-auto">
-                <table className="w-full min-w-[520px] border-collapse text-sm">
-                  <thead><tr className="border-b border-encre text-left"><th className="py-1 pr-4 font-medium">Champ attendu</th><th className="font-medium">Colonne du fichier</th></tr></thead>
+              <div className="carte overflow-x-auto">
+                <table className="donnees min-w-[520px]">
+                  <thead><tr><th>Champ attendu</th><th>Colonne du fichier</th></tr></thead>
                   <tbody>
                     {Object.keys(correspondance).map((champ) => (
                       <tr key={champ} className="border-b border-filet">
-                        <td className="py-1 pr-4">{CHAMPS[champ] ?? champ}{apercu.champs_manquants.includes(champ) && !correspondance[champ] && <span className="ml-2 text-tampon">obligatoire</span>}</td>
+                        <td>{CHAMPS[champ] ?? champ}{apercu.champs_manquants.includes(champ) && !correspondance[champ] && <span className="ml-2 font-semibold text-encre">obligatoire</span>}</td>
                         <td>
                           <label className="sr-only" htmlFor={`col-${champ}`}>Colonne pour {CHAMPS[champ] ?? champ}</label>
                           <select id={`col-${champ}`} className="champ" value={correspondance[champ] ?? ""}
@@ -112,8 +112,8 @@ export default function Import() {
 
       {rapport && (
         <section className="grid gap-3">
-          <h2 className="text-xl font-semibold">Rapport : {rapport.fichier}</h2>
-          <dl className="flex flex-wrap gap-x-8 gap-y-2 border-y-2 border-encre py-3">
+          <h2 className="text-[16px] font-semibold">Rapport : {rapport.fichier}</h2>
+          <dl className="flex flex-wrap gap-x-8 gap-y-2 carte px-5 py-3">
             {[["lues", rapport.lignes_lues], ["acceptées", rapport.lignes_acceptees], ["à vérifier", rapport.lignes_avertissement], ["rejetées", rapport.lignes_rejetees]]
               .map(([k, v]) => <div key={k as string}><dt className="etiquette">{k}</dt><dd className="chiffres text-xl">{v}</dd></div>)}
           </dl>
@@ -126,8 +126,8 @@ export default function Import() {
           <ul className="grid max-h-80 gap-1 overflow-y-auto text-sm">
             {rapport.anomalies.map((a, i) => (
               <li key={i} className="flex flex-wrap gap-x-3 border-b border-filet py-1">
-                <span className="chiffres w-16 text-encre-pale">ligne {a.ligne}</span>
-                <span className={a.gravite === "rejet" ? "text-tampon" : "text-alerte"}>{a.gravite === "rejet" ? "rejetée" : "à vérifier"}</span>
+                <span className="chiffres w-16 text-doux">ligne {a.ligne}</span>
+                <span className={a.gravite === "rejet" ? "font-semibold text-encre" : "text-encre"}>{a.gravite === "rejet" ? "rejetée" : "à vérifier"}</span>
                 <span>{a.message}</span>
               </li>
             ))}
@@ -136,25 +136,25 @@ export default function Import() {
       )}
 
       <section className="grid gap-3">
-        <h2 className="text-xl font-semibold">À traiter</h2>
+        <h2 className="text-[16px] font-semibold">À traiter</h2>
         {!anomalies.donnees?.length && !aVerifier.donnees?.length && !enAttente.donnees?.length && (
-          <p className="text-sm text-encre-pale">Aucune anomalie en attente.</p>
+          <p className="text-sm text-doux">Aucune anomalie en attente.</p>
         )}
         {enAttente.donnees?.map((c) => <ClientEnAttente key={c.id} client={c} lecture={lecture} apres={toutRecharger} />)}
         {aVerifier.donnees?.map((f) => (
           <div key={f.id} className="grid gap-2 border border-filet px-4 py-3">
             <div className="flex flex-wrap items-center gap-3">
-              <Tampon ton="alerte">À vérifier</Tampon>
-              <Link href={`/factures/${f.id}`} className="chiffres underline-offset-2 hover:underline">{f.numero}</Link>
+              <span className="badge-contour">À vérifier</span>
+              <Link href={`/app/factures/${f.id}`} className="chiffres underline-offset-2 hover:underline">{f.numero}</Link>
               <span>{f.nom_client}</span><span className="chiffres">{f.solde_affiche}</span>
-              <span className="text-sm text-encre-pale">{f.motif_verification?.replace(/_/g, " ").toLowerCase()}</span>
+              <span className="text-sm text-doux">{f.motif_verification?.replace(/_/g, " ").toLowerCase()}</span>
             </div>
             {!lecture && (
               <div className="flex flex-wrap gap-2">
                 <BoutonAction variante="second" onClick={() => agir(() => api(`/api/factures/${f.id}/confirmer`, { corps: { motif: "Vérifiée" } }), "Doute levé : la facture peut être relancée").then(toutRecharger)}>
                   Confirmer la facture
                 </BoutonAction>
-                <DecisionMotivee libelle="Annuler (doublon ou erreur)" action="Annuler la facture" variante="danger"
+                <DecisionMotivee libelle="Annuler (doublon ou erreur)" action="Annuler la facture" variante="encre"
                                  onValider={(m) => agir(() => api(`/api/factures/${f.id}/annuler`, { corps: { motif: m } }), "Facture annulée et clôturée").then(toutRecharger)} />
               </div>
             )}
@@ -163,8 +163,8 @@ export default function Import() {
         {anomalies.donnees?.map((a) => (
           <div key={a.id} className="grid gap-2 border border-filet px-4 py-3">
             <div className="flex flex-wrap items-center gap-3 text-sm">
-              <Tampon>Rejetée</Tampon>
-              <span className="chiffres text-encre-pale">{a.fichier} · ligne {a.ligne}</span>
+              <span className="badge-encre">Rejetée</span>
+              <span className="chiffres text-doux">{a.fichier} · ligne {a.ligne}</span>
               <span>{a.message}</span>
             </div>
             {!lecture && (
@@ -173,7 +173,7 @@ export default function Import() {
                   Classer (la base fait foi)
                 </BoutonAction>
                 {a.code === "CONFLIT_NUMERO" && utilisateur.role === "validateur" && (
-                  <DecisionMotivee libelle="Remplacer la facture par cette ligne" action="Remplacer" variante="danger"
+                  <DecisionMotivee libelle="Remplacer la facture par cette ligne" action="Remplacer" variante="encre"
                                    onValider={(m) => agir(() => api(`/api/anomalies/${a.id}/resolution`, { corps: { decision: "remplacer", motif: m } }), "Facture remplacée").then(toutRecharger)} />
                 )}
               </div>
@@ -183,19 +183,19 @@ export default function Import() {
       </section>
 
       <section className="grid gap-2">
-        <h2 className="text-xl font-semibold">Imports passés</h2>
-        <div className="overflow-x-auto">
-          <table className="w-full min-w-[640px] border-collapse text-sm">
-            <thead><tr className="border-b border-encre text-left">
-              <th className="py-1.5 pr-4 font-medium">Fichier</th><th className="pr-4 font-medium">Type</th><th className="pr-4 font-medium">Par</th>
-              <th className="pr-4 font-medium">Le</th><th className="pr-4 text-right font-medium">Lues</th><th className="pr-4 text-right font-medium">Rejetées</th>
+        <h2 className="text-[16px] font-semibold">Imports passés</h2>
+        <div className="carte overflow-x-auto">
+          <table className="donnees min-w-[640px]">
+            <thead><tr>
+              <th>Fichier</th><th>Type</th><th>Par</th>
+              <th>Le</th><th className="text-right">Lues</th><th className="text-right">Rejetées</th>
             </tr></thead>
             <tbody>
               {historique.donnees?.map((i) => (
                 <tr key={i.id} className="border-b border-filet">
-                  <td className="py-1.5 pr-4">{i.fichier}</td><td className="pr-4">{i.type}</td><td className="pr-4">{i.importe_par}</td>
-                  <td className="chiffres pr-4">{heure(i.importe_le)}</td><td className="chiffres pr-4 text-right">{i.lignes_lues}</td>
-                  <td className="chiffres pr-4 text-right">{i.lignes_rejetees}</td>
+                  <td>{i.fichier}</td><td>{i.type}</td><td>{i.importe_par}</td>
+                  <td className="chiffres">{heure(i.importe_le)}</td><td className="chiffres text-right">{i.lignes_lues}</td>
+                  <td className="chiffres text-right">{i.lignes_rejetees}</td>
                 </tr>
               ))}
             </tbody>
@@ -213,8 +213,8 @@ function ClientEnAttente({ client, lecture, apres }: { client: { id: number; cod
   const [canal, setCanal] = useState("sms");
   return (
     <div className="grid gap-2 border border-filet px-4 py-3">
-      <div className="flex flex-wrap items-center gap-3 text-sm"><Tampon ton="alerte">Client inconnu</Tampon><span className="chiffres">{client.code}</span>
-        <span className="text-encre-pale">créé à l'import d'une facture : complétez sa fiche pour libérer ses factures</span></div>
+      <div className="flex flex-wrap items-center gap-3 text-sm"><span className="badge-contour">Client inconnu</span><span className="chiffres">{client.code}</span>
+        <span className="text-doux">créé à l'import d'une facture : complétez sa fiche pour libérer ses factures</span></div>
       {!lecture && (
         <form className="flex flex-wrap items-center gap-2" onSubmit={(e) => e.preventDefault()}>
           <label className="sr-only" htmlFor={`nom-${client.id}`}>Nom</label>

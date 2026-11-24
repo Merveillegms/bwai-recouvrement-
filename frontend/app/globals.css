@@ -2,67 +2,58 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Registre comptable : un grand livre de recouvrement.
-   Papier crème, encre bleu nuit, filets fins ; le rouge « tampon » est réservé à ce qui exige une décision. */
-:root {
-  --papier: #f3efe3;
-  --papier-fonce: #e9e3d3;
-  --encre: #1b2a41;
-  --encre-pale: #52607a;
-  --filet: #c9bfa8;
-  --lavis: #dfe6f0;
-  --tampon: #a8322b;
-  --ok: #2f6b4f;
-  --alerte: #8a5a0b;
-  color-scheme: light;
-}
+/* Recouvra. Encre et vert sur gris neutres. Aucune italique nulle part. */
+:root { color-scheme: light; }
 
-html, body { height: 100%; }
+html, body { min-height: 100%; }
 body {
-  background: var(--papier);
-  color: var(--encre);
-  font-family: "IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
-  font-size: 15px;
-  line-height: 1.5;
-  padding-left: max(0px, env(safe-area-inset-left, 0px));
-  padding-right: max(0px, env(safe-area-inset-right, 0px));
+  background: #f6f8fa;
+  color: #0b1324;
+  font-family: Inter, "Segoe UI", system-ui, sans-serif;
+  font-size: 14.5px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
 }
-
-h1, h2, h3 { font-family: Spectral, Georgia, serif; text-wrap: balance; }
-.chiffres { font-family: "IBM Plex Mono", Consolas, monospace; font-variant-numeric: tabular-nums; }
-
-:focus-visible { outline: 2px solid var(--encre); outline-offset: 2px; }
+em, i, cite, address, dfn, var { font-style: normal; }
+h1, h2, h3, h4 { font-family: Sora, "Segoe UI", system-ui, sans-serif; letter-spacing: -0.015em; text-wrap: balance; }
+.chiffres { font-family: "JetBrains Mono", Consolas, monospace; font-variant-numeric: tabular-nums; }
+.tabulaire { font-variant-numeric: tabular-nums; }
+:focus-visible { outline: 2px solid #0e9f6e; outline-offset: 2px; }
 
 @layer components {
-  /* Page de registre : lignes réglées comme un cahier comptable. */
-  .registre { background-image: repeating-linear-gradient(to bottom, transparent 0 calc(3.75rem - 1px), var(--filet) calc(3.75rem - 1px) 3.75rem); }
-
-  /* Tampon encré : un état qui demande une attention humaine. */
-  .tampon {
-    display: inline-block; border: 2px solid currentColor; padding: 0 0.4rem; font-size: 0.66rem; font-weight: 600;
-    letter-spacing: 0.14em; text-transform: uppercase; transform: rotate(-2.5deg); line-height: 1.35;
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-vert px-4 py-2 text-[13.5px] font-semibold text-white transition-colors hover:bg-vert-fonce disabled:cursor-progress disabled:opacity-50;
   }
-
-  .etiquette { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.1em; color: var(--encre-pale); }
-
-  .bouton {
-    display: inline-flex; align-items: center; gap: 0.4rem; border: 1.5px solid var(--encre); background: var(--encre);
-    color: var(--papier); padding: 0.4rem 0.9rem; font-size: 0.88rem; font-weight: 500; cursor: pointer;
-    transition: opacity .15s;
+  .btn-sec {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-white px-4 py-2 text-[13.5px] font-semibold text-encre shadow-[inset_0_0_0_1px_#dfe4ea] transition-colors hover:bg-filet-2 disabled:cursor-progress disabled:opacity-50;
   }
-  .bouton:disabled { opacity: .45; cursor: progress; }
-  .bouton-second { background: transparent; color: var(--encre); }
-  .bouton-danger { background: transparent; color: var(--tampon); border-color: var(--tampon); }
+  .btn-encre {
+    @apply inline-flex items-center justify-center gap-2 rounded-lg bg-encre px-4 py-2 text-[13.5px] font-semibold text-white transition-colors hover:bg-encre-2 disabled:cursor-progress disabled:opacity-50;
+  }
+  .btn-lien { @apply text-[13.5px] font-semibold text-vert underline-offset-4 hover:underline; }
+
+  .carte { @apply rounded-xl border border-filet bg-white shadow-carte; }
+  .tuile { @apply carte grid gap-0.5 px-4 py-3.5; }
+  .etiquette { @apply text-[11.5px] font-semibold uppercase tracking-[0.06em] text-doux; }
+
+  .badge { @apply inline-flex items-center gap-1.5 whitespace-nowrap rounded-full bg-filet-2 px-2.5 py-0.5 text-[11.5px] font-semibold text-encre; }
+  .badge-encre { @apply badge bg-encre text-white; }
+  .badge-vert { @apply badge bg-vert-pale text-vert-fonce; }
+  .badge-contour { @apply badge bg-white shadow-[inset_0_0_0_1.5px_#0b1324]; }
 
   .champ {
-    border: 1px solid var(--filet); background: #fbf9f3; padding: 0.35rem 0.55rem; font: inherit; color: var(--encre);
-    min-width: 0;
+    @apply min-w-0 rounded-lg border border-[#dfe4ea] bg-white px-3 py-2 text-[13.5px] text-encre outline-none transition-shadow placeholder:text-[#8d96a7] focus:border-vert focus:shadow-[0_0_0_3px_#e7f6f0];
   }
-  .champ:focus { outline: 2px solid var(--encre); outline-offset: 0; }
 
-  .filet-double { border-bottom: 3px double var(--encre); }
+  .donnees { @apply w-full border-collapse tabulaire; }
+  .donnees th { @apply border-b border-filet bg-[#fafbfc] px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-[0.05em] text-doux; }
+  .donnees td { @apply border-b border-filet-2 px-4 py-3 align-middle; }
+  .donnees tbody tr:last-child td { @apply border-b-0; }
+  .donnees tbody tr:hover { @apply bg-[#fafbfc]; }
+
+  .alerte { @apply flex items-start gap-3 rounded-xl bg-encre px-4 py-3 text-[13.5px] text-white; }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  * { transition: none !important; animation: none !important; }
+  *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
 }

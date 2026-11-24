@@ -647,6 +647,7 @@ def etat_systeme(conn: sqlite3.Connection = Depends(base), u: dict = Depends(uti
                 "relances_en_echec": un("SELECT count(DISTINCT lot_envoi) FROM relances WHERE statut = 'echec'"),
             },
             "factures": un("SELECT count(*) FROM factures"),
+            "reponses_a_traiter": un("SELECT count(*) FROM reponses_entrantes WHERE statut = 'a_traiter'"),
             "relances": compte, "verrous": [dict(v) for v in conn.execute("SELECT nom, acquis_le, expire_le FROM verrous")]}
 
 

@@ -2,7 +2,7 @@
 
 import { useParams } from "next/navigation";
 import { useState } from "react";
-import { BoutonAction, Chargement, DecisionMotivee, Drapeaux, Erreur, Statut, Tampon } from "@/components/ui";
+import { BoutonAction, Chargement, DecisionMotivee, Drapeaux, Erreur, Statut } from "@/components/ui";
 import { api, ouvrirFichier } from "@/lib/api";
 import { useApp, useDonnees } from "@/lib/donnees";
 import { date, heure, TRANCHES } from "@/lib/libelles";
@@ -29,10 +29,10 @@ export default function FicheFacture() {
     <div className="grid gap-6">
       <div className="flex flex-wrap items-end justify-between gap-4 border-b border-filet pb-4">
         <div>
-          <p className="chiffres text-sm text-encre-pale">{f.numero} · {f.code_client} · réf. de paiement {f.reference_paiement}</p>
-          <h1 className="text-3xl font-semibold">{f.nom_client}</h1>
+          <p className="chiffres text-sm text-doux">{f.numero} · {f.code_client} · réf. de paiement {f.reference_paiement}</p>
+          <h1 className="text-[22px] font-semibold">{f.nom_client}</h1>
           <div className="mt-1 flex flex-wrap items-center gap-3"><Statut statut={f.statut} /><Drapeaux drapeaux={f.drapeaux} />
-            {f.en_litige && <Tampon>Litige</Tampon>}{f.suspendue && <Tampon ton="alerte">Suspendue</Tampon>}</div>
+            {f.en_litige && <span className="badge-encre">Litige</span>}{f.suspendue && <span className="badge-contour">Suspendue</span>}</div>
         </div>
         {f.solde > 0 && (
           <BoutonAction variante="second" onClick={() => ouvrirFichier(`/api/factures/${f.id}/fiche-paiement.pdf`, `fiche_${f.numero}.pdf`)}>
@@ -43,32 +43,32 @@ export default function FicheFacture() {
 
       <div className="grid items-start gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)]">
         <section className="grid gap-5">
-          <dl className="grid grid-cols-2 gap-x-6 gap-y-3 border-y-2 border-encre py-4 sm:grid-cols-3">
+          <dl className="grid grid-cols-2 gap-x-6 gap-y-3 carte px-5 py-4 sm:grid-cols-3">
             {[["Montant TTC", f.montant_ttc_affiche], ["Déjà réglé", f.total_paye_affiche], ["Avoirs", f.total_avoirs_affiche],
               ["Reste à payer", f.solde_affiche], ["Émise le", date(f.date_emission)], ["Échéance", date(f.date_echeance)],
               ["Retard", `${f.jours_retard} j`], ["Ancienneté", f.tranche ? TRANCHES[f.tranche] : "-"], ["Version", String(f.version)]]
               .map(([k, v]) => <div key={k}><dt className="etiquette">{k}</dt><dd className={`chiffres ${k === "Reste à payer" ? "text-lg font-medium" : ""}`}>{v}</dd></div>)}
           </dl>
-          {f.trop_percu > 0 && <p className="text-sm text-alerte">Trop-perçu de {f.trop_percu_affiche} à restituer ou imputer.</p>}
+          {f.trop_percu > 0 && <p className="text-sm text-encre">Trop-perçu de {f.trop_percu_affiche} à restituer ou imputer.</p>}
           {f.motif_cloture && <p className="text-sm">Clôturée : {f.motif_cloture}</p>}
 
           {pourquoi.donnees && (
-            <div className="grid gap-2 border border-filet bg-[#f8f5ec] p-4">
+            <div className="grid gap-2 carte p-4">
               <span className="etiquette">Pourquoi cette facture {pourquoi.donnees.dans_la_file ? "est dans la file du jour" : "n'est pas relancée"}</span>
-              <p className="font-titre text-lg leading-snug">{pourquoi.donnees.dans_la_file ? pourquoi.donnees.explication : pourquoi.donnees.motif}</p>
-              {pourquoi.donnees.detail && <ul className="chiffres grid gap-0.5 text-xs text-encre-pale">{pourquoi.donnees.detail.map((d) => <li key={d}>{d}</li>)}</ul>}
+              <p className="leading-relaxed">{pourquoi.donnees.dans_la_file ? pourquoi.donnees.explication : pourquoi.donnees.motif}</p>
+              {pourquoi.donnees.detail && <ul className="chiffres grid gap-0.5 text-xs text-doux">{pourquoi.donnees.detail.map((d) => <li key={d}>{d}</li>)}</ul>}
             </div>
           )}
 
           {f.paiements.length > 0 && (
             <div className="grid gap-2">
-              <h2 className="text-lg font-semibold">Paiements</h2>
+              <h2 className="text-[15px] font-semibold">Paiements</h2>
               <ul className="grid gap-1 text-sm">
                 {f.paiements.map((p) => (
                   <li key={p.id} className="flex flex-wrap justify-between gap-2 border-b border-filet py-1">
                     <span className="chiffres">{date(p.date_paiement)} · {p.id_transaction}</span>
                     <span className="chiffres">{p.montant_affiche ?? p.montant}</span>
-                    <span className="text-encre-pale">{p.statut_rapprochement === "rapproche" ? "rapproché" : "proposé, à valider"}</span>
+                    <span className="text-doux">{p.statut_rapprochement === "rapproche" ? "rapproché" : "proposé, à valider"}</span>
                   </li>
                 ))}
               </ul>
@@ -81,19 +81,19 @@ export default function FicheFacture() {
         </section>
 
         <section className="grid gap-3">
-          <h2 className="text-lg font-semibold">Historique</h2>
+          <h2 className="text-[15px] font-semibold">Historique</h2>
           {frise.donnees ? (
             <ol className="grid border-l-2 border-encre">
               {frise.donnees.evenements.map((e) => (
                 <li key={e.id} className="relative grid gap-0.5 py-2 pl-5">
-                  <span className={`absolute -left-[5px] top-3.5 h-2 w-2 rounded-full ${e.type_acteur === "humain" ? "bg-tampon" : "bg-encre"}`} aria-hidden="true" />
-                  <span className="chiffres text-xs text-encre-pale">{heure(e.horodatage)} · {e.acteur}{e.type_acteur === "humain" ? "" : ` (${e.type_acteur})`}</span>
+                  <span className={`absolute -left-[5px] top-3.5 h-2 w-2 rounded-full ${e.type_acteur === "humain" ? "bg-vert" : "bg-encre"}`} aria-hidden="true" />
+                  <span className="chiffres text-xs text-doux">{heure(e.horodatage)} · {e.acteur}{e.type_acteur === "humain" ? "" : ` (${e.type_acteur})`}</span>
                   <span className="text-sm">{e.libelle}</span>
                 </li>
               ))}
             </ol>
           ) : <Chargement />}
-          <p className="text-xs text-encre-pale">Point rouge : décision humaine. Point bleu nuit : règle appliquée par le système.</p>
+          <p className="text-xs text-doux">Point rouge : décision humaine. Point bleu nuit : règle appliquée par le système.</p>
         </section>
       </div>
     </div>
@@ -109,7 +109,7 @@ function Actions({ f, role, dateSimulee, action, tout }: { f: Facture; role: str
   const validateur = role === "validateur";
   return (
     <div className="grid gap-4 border-t border-filet pt-4">
-      <h2 className="text-lg font-semibold">Actions</h2>
+      <h2 className="text-[15px] font-semibold">Actions</h2>
 
       <div className="grid gap-2">
         <span className="etiquette">Réponse du client</span>
@@ -133,7 +133,7 @@ function Actions({ f, role, dateSimulee, action, tout }: { f: Facture; role: str
       </div>
 
       <div className="flex flex-wrap gap-2">
-        {!f.en_litige && <DecisionMotivee libelle="Déclarer un litige" action="Déclarer" variante="danger"
+        {!f.en_litige && <DecisionMotivee libelle="Déclarer un litige" action="Déclarer" variante="encre"
                                           onValider={(m) => action(`/api/factures/${f.id}/litige`, { motif: m }, "Litige déclaré : plus aucune relance automatique")} />}
         {f.en_litige && validateur && <DecisionMotivee libelle="Lever le litige" action="Lever"
                                                         onValider={(m) => action(`/api/factures/${f.id}/lever-litige`, { motif: m }, "Litige levé")} />}
@@ -157,7 +157,7 @@ function Actions({ f, role, dateSimulee, action, tout }: { f: Facture; role: str
               Émettre un avoir
             </BoutonAction>
           </div>
-          <DecisionMotivee libelle="Passer en perte" action="Confirmer le passage en perte" variante="danger"
+          <DecisionMotivee libelle="Passer en perte" action="Confirmer le passage en perte" variante="encre"
                            onValider={(m) => action(`/api/factures/${f.id}/perte`, { motif: m }, "Facture passée en perte et clôturée")} />
         </div>
       )}

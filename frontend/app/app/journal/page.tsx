@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { BoutonAction, Chargement, EnTetePage, Erreur, EtatVide, Tampon } from "@/components/ui";
+import { BoutonAction, Chargement, EnTetePage, Erreur, EtatVide } from "@/components/ui";
 import { ouvrirFichier } from "@/lib/api";
 import { useApp, useDonnees } from "@/lib/donnees";
 import { heure } from "@/lib/libelles";
@@ -31,8 +31,8 @@ export default function Journal() {
     <div className="grid gap-5">
       <EnTetePage titre="Journal" sousTitre="Chaque décision, humaine ou automatique, avec sa règle. Le journal ne se modifie pas : il s'ajoute.">
         {integrite.donnees && (integrite.donnees.intact
-          ? <span className="text-sm text-ok">Chaîne d'empreintes intacte · <span className="chiffres">{integrite.donnees.lignes_verifiees}</span> lignes vérifiées</span>
-          : <Tampon>Altération détectée : lignes {integrite.donnees.lignes_alterees.join(", ")}</Tampon>)}
+          ? <span className="text-sm text-vert">Chaîne d'empreintes intacte · <span className="chiffres">{integrite.donnees.lignes_verifiees}</span> lignes vérifiées</span>
+          : <span className="badge-encre">Altération détectée : lignes {integrite.donnees.lignes_alterees.join(", ")}</span>)}
         <BoutonAction variante="second" onClick={() => ouvrirFichier(`/api/journal/export.csv?${params}`, "journal.csv", true).catch(() => notifier("Export impossible", "erreur"))}>
           Exporter en CSV
         </BoutonAction>
@@ -63,30 +63,30 @@ export default function Journal() {
       {erreur && <Erreur message={erreur} />}
       {chargement && !donnees ? <Chargement /> : !donnees?.lignes.length ? <EtatVide titre="Aucune ligne pour ces critères" /> : (
         <>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[860px] border-collapse text-sm">
-              <thead><tr className="border-b-2 border-encre text-left">
-                <th className="py-2 pr-3 font-medium">N°</th><th className="pr-3 font-medium">Quand</th><th className="pr-3 font-medium">Qui</th>
-                <th className="pr-3 font-medium">Quoi</th><th className="pr-3 font-medium">Règle</th><th className="font-medium">Empreinte</th>
+          <div className="carte overflow-x-auto">
+            <table className="donnees min-w-[860px]">
+              <thead><tr>
+                <th>N°</th><th>Quand</th><th>Qui</th>
+                <th>Quoi</th><th>Règle</th><th>Empreinte</th>
               </tr></thead>
               <tbody>
                 {donnees.lignes.map((l) => (
                   <tr key={l.id} className="border-b border-filet align-top">
-                    <td className="chiffres py-1.5 pr-3 text-encre-pale">{l.id}</td>
-                    <td className="chiffres whitespace-nowrap pr-3">{heure(l.horodatage)}</td>
-                    <td className="pr-3">{l.acteur}{l.type_acteur !== "humain" && <span className="text-encre-pale"> ({l.type_acteur})</span>}</td>
-                    <td className="pr-3">{l.libelle}</td>
-                    <td className="chiffres pr-3 text-xs text-encre-pale">{l.regle}</td>
-                    <td className="chiffres text-xs text-encre-pale" title={l.hash}>{l.hash.slice(0, 10)}…</td>
+                    <td className="chiffres text-doux">{l.id}</td>
+                    <td className="chiffres whitespace-nowrap">{heure(l.horodatage)}</td>
+                    <td>{l.acteur}{l.type_acteur !== "humain" && <span className="text-doux"> ({l.type_acteur})</span>}</td>
+                    <td>{l.libelle}</td>
+                    <td className="chiffres text-xs text-doux">{l.regle}</td>
+                    <td className="chiffres text-xs text-doux" title={l.hash}>{l.hash.slice(0, 10)}…</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
           <div className="flex flex-wrap items-center gap-3 text-sm">
-            <button type="button" className="bouton bouton-second" disabled={decalage === 0} onClick={() => setDecalage(Math.max(0, decalage - PAGE))}>Plus récentes</button>
-            <span className="chiffres text-encre-pale">{decalage + 1} à {Math.min(decalage + PAGE, donnees.total)} sur {donnees.total}</span>
-            <button type="button" className="bouton bouton-second" disabled={decalage + PAGE >= donnees.total} onClick={() => setDecalage(decalage + PAGE)}>Plus anciennes</button>
+            <button type="button" className="btn-sec" disabled={decalage === 0} onClick={() => setDecalage(Math.max(0, decalage - PAGE))}>Plus récentes</button>
+            <span className="chiffres text-doux">{decalage + 1} à {Math.min(decalage + PAGE, donnees.total)} sur {donnees.total}</span>
+            <button type="button" className="btn-sec" disabled={decalage + PAGE >= donnees.total} onClick={() => setDecalage(decalage + PAGE)}>Plus anciennes</button>
           </div>
         </>
       )}

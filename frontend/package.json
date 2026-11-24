@@ -11,9 +11,9 @@
     "types": "openapi-typescript lib/openapi.json -o lib/api-schema.d.ts"
   },
   "dependencies": {
-    "@fontsource/ibm-plex-mono": "5.3.0",
-    "@fontsource/ibm-plex-sans": "5.3.0",
-    "@fontsource/spectral": "5.3.0",
+    "@fontsource/inter": "5.3.0",
+    "@fontsource/jetbrains-mono": "5.3.0",
+    "@fontsource/sora": "5.3.0",
     "next": "15.5.29",
     "react": "19.3.1",
     "react-dom": "19.3.1"

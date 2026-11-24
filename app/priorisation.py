@@ -136,6 +136,8 @@ class Priorite:
             "rang": self.rang, "facture": self.facture.en_dict(), "score": str(self.score),
             "facteurs": {k: str(v) for k, v in asdict(self.facteurs).items()},
             "poids": {k: str(v) for k, v in self.poids.items()}, "historique": asdict(self.historique),
+            "points": {k: str(_q(getattr(self.facteurs, k) * self.poids[k] * CENT, Decimal("0.01"))) for k in self.poids},
+            "points_max": {k: str(_q(v * CENT, Decimal("0.01"))) for k, v in self.poids.items()},
             "etape": self.etape, "validation_humaine": self.validation_humaine,
             "raisons_validation": self.raisons_validation, "explication": self.explication, "detail": self.detail,
         }
@@ -169,7 +171,7 @@ def _expliquer(p: Priorite) -> None:
         histo = "aucun historique de règlement"
     p.explication = (f"Priorité {p.rang} : {_pluriel(f.jours_retard, 'jour')} de retard, solde de "
                      f"{formater(f.solde, f.devise, f.decimales)}, {histo}"
-                     + (" — gros montant, placé en tête pour validation humaine" if p.gros_montant else ""))
+                     + (". Gros montant, placé en tête pour validation humaine" if p.gros_montant else ""))
     c = p.facteurs
     p.detail = [
         f"Ancienneté : {f.jours_retard} j → facteur {c.anciennete} × poids {p.poids['anciennete']}"

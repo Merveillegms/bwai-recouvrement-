@@ -7,7 +7,7 @@ import { api, fermerSession, session } from "@/lib/api";
 import { FournisseurApp, useApp } from "@/lib/donnees";
 import { dateLongue, ROLES } from "@/lib/libelles";
 import type { Utilisateur } from "@/lib/types";
-import { Tampon } from "./ui";
+import { Icones } from "./icones";
 
 export function Coquille({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -22,74 +22,89 @@ export function Coquille({ children }: { children: ReactNode }) {
   if (!utilisateur) return null;
   return (
     <FournisseurApp utilisateur={utilisateur}>
-      <EnTete />
-      <main className="mx-auto w-full max-w-[1240px] px-4 pb-16 pt-6 sm:px-6">{children}</main>
+      <div className="min-h-screen lg:grid lg:grid-cols-[232px_minmax(0,1fr)]">
+        <Lateral />
+        <div className="min-w-0">
+          <BandeauArret />
+          <main className="mx-auto grid w-full max-w-[1280px] gap-6 py-6 sm:py-8"
+                style={{ paddingLeft: "max(16px, env(safe-area-inset-left, 0px))", paddingRight: "max(16px, env(safe-area-inset-right, 0px))" }}>
+            {children}
+          </main>
+        </div>
+      </div>
     </FournisseurApp>
   );
 }
 
-function EnTete() {
+function Lateral() {
   const { utilisateur, systeme } = useApp();
   const chemin = usePathname();
   const router = useRouter();
   const a = systeme?.a_traiter;
-  const liens: { href: string; libelle: string; compte?: number }[] = [
-    { href: "/", libelle: "Aujourd'hui" },
-    { href: "/validation", libelle: "Validation", compte: a ? a.lots_a_valider + a.lots_a_envoyer + a.relances_en_echec : 0 },
-    { href: "/paiements", libelle: "Paiements", compte: a?.paiements_a_valider },
-    { href: "/factures", libelle: "Factures" },
-    { href: "/import", libelle: "Import", compte: a ? a.anomalies_ouvertes + a.factures_a_verifier : 0 },
-    { href: "/journal", libelle: "Journal" },
-    { href: "/tableau", libelle: "Tableau de bord" },
-    { href: "/reglages", libelle: "Réglages" },
+  const liens = [
+    { href: "/app", libelle: "Aujourd'hui", icone: Icones.jour },
+    { href: "/app/validation", libelle: "Validation", icone: Icones.validation, compte: a ? a.lots_a_valider + a.lots_a_envoyer + a.relances_en_echec : 0 },
+    { href: "/app/paiements", libelle: "Paiements", icone: Icones.paiements, compte: a?.paiements_a_valider },
+    { href: "/app/reponses", libelle: "Réponses clients", icone: Icones.reponses, compte: systeme?.reponses_a_traiter },
+    { href: "/app/factures", libelle: "Factures", icone: Icones.factures },
+    { href: "/app/import", libelle: "Import", icone: Icones.import, compte: a ? a.anomalies_ouvertes + a.factures_a_verifier : 0 },
+    { href: "/app/journal", libelle: "Journal", icone: Icones.journal },
+    { href: "/app/tableau", libelle: "Tableau de bord", icone: Icones.tableau },
+    { href: "/app/reglages", libelle: "Réglages", icone: Icones.reglages },
   ];
-  const actif = (href: string) => (href === "/" ? chemin === "/" : chemin.startsWith(href));
+  const actif = (href: string) => (href === "/app" ? chemin === "/app" : chemin.startsWith(href));
+  const deconnecter = async () => {
+    try { await api("/api/auth/deconnexion", { methode: "POST" }); } catch { /* session déjà expirée */ }
+    fermerSession();
+    router.replace("/connexion");
+  };
 
   return (
-    <header className="sticky z-30 bg-papier" style={{ top: "env(safe-area-inset-top, 0px)" }}>
-      <div className="filet-double mx-auto flex max-w-[1240px] flex-wrap items-baseline justify-between gap-x-6 gap-y-1 px-4 pb-2 pt-4 sm:px-6">
-        <Link href="/" className="font-titre text-2xl font-semibold">
-          Recouvrement
-          <span className="ml-2 font-texte text-sm font-normal text-encre-pale">{systeme?.entreprise}</span>
+    <aside className="sticky z-30 bg-encre text-[#b8c2d4] lg:flex lg:h-screen lg:flex-col"
+           style={{ top: "env(safe-area-inset-top, 0px)" }}>
+      <div className="flex items-center justify-between gap-3 px-4 py-3 lg:px-5 lg:pb-5 lg:pt-6">
+        <Link href="/" className="flex items-center gap-2.5 font-titre text-[16px] font-bold text-white">
+          <span className="grid h-7 w-7 place-items-center rounded-lg bg-vert text-[13px]">R</span>Recouvra
         </Link>
-        <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 text-sm">
-          {systeme && (
-            <span className="chiffres" title={systeme.date_simulee ? "Date simulée (mode démonstration)" : "Date du jour"}>
-              {dateLongue(systeme.date_du_jour)}{systeme.date_simulee && <span className="text-encre-pale"> · simulée</span>}
-            </span>
-          )}
-          <span className="text-encre-pale">{utilisateur.nom} · {ROLES[utilisateur.role]}</span>
-          <button type="button" className="underline underline-offset-2"
-                  onClick={async () => {
-                    try { await api("/api/auth/deconnexion", { methode: "POST" }); } catch { /* déjà expirée */ }
-                    fermerSession();
-                    router.replace("/connexion");
-                  }}>
-            Se déconnecter
-          </button>
-        </div>
+        <button type="button" onClick={deconnecter} className="text-[12.5px] text-[#8b97ad] hover:text-white lg:hidden">Se déconnecter</button>
       </div>
-      <nav className="border-b border-filet" aria-label="Sections">
-        <ul className="mx-auto flex max-w-[1240px] flex-wrap gap-x-5 px-4 text-sm sm:px-6">
+      <nav aria-label="Sections" className="overflow-x-auto px-3 pb-3 lg:flex-1 lg:overflow-y-auto lg:pb-0">
+        <ul className="flex gap-1 lg:grid">
           {liens.map((l) => (
             <li key={l.href}>
               <Link href={l.href} aria-current={actif(l.href) ? "page" : undefined}
-                    className={`inline-block border-b-2 py-2 ${actif(l.href) ? "border-encre font-semibold" : "border-transparent text-encre-pale hover:text-encre"}`}>
-                {l.libelle}
-                {!!l.compte && <span className="chiffres ml-1.5 text-tampon">{l.compte}</span>}
+                    className={`flex items-center gap-2.5 whitespace-nowrap rounded-lg px-3 py-2 text-[13.5px] transition-colors ${actif(l.href) ? "bg-encre-2 font-semibold text-white" : "hover:bg-encre-2/60 hover:text-white"}`}>
+                {l.icone}
+                <span>{l.libelle}</span>
+                {!!l.compte && <span className="ml-auto rounded-full bg-vert px-1.5 text-[11px] font-bold text-white tabulaire">{l.compte}</span>}
               </Link>
             </li>
           ))}
         </ul>
       </nav>
-      {systeme?.arret_urgence && (
-        <div className="border-b-2 border-tampon bg-papier-fonce">
-          <p className="mx-auto flex max-w-[1240px] flex-wrap items-center gap-3 px-4 py-2 text-sm text-tampon sm:px-6">
-            <Tampon>Arrêt d'urgence</Tampon>
-            Aucune relance n'est préparée ni envoyée. Le validateur peut le lever dans Réglages.
-          </p>
-        </div>
-      )}
-    </header>
+      <div className="hidden border-t border-encre-3 px-5 py-4 text-[12.5px] lg:grid lg:gap-1">
+        {systeme && (
+          <span className="text-white">{dateLongue(systeme.date_du_jour)}{systeme.date_simulee && <span className="text-[#8b97ad]"> (simulée)</span>}</span>
+        )}
+        <span>{utilisateur.nom}</span>
+        <span className="text-[#8b97ad]">{ROLES[utilisateur.role]}</span>
+        <button type="button" onClick={deconnecter} className="mt-2 flex items-center gap-2 text-left text-[#8b97ad] hover:text-white">
+          {Icones.sortie}Se déconnecter
+        </button>
+      </div>
+    </aside>
+  );
+}
+
+function BandeauArret() {
+  const { systeme } = useApp();
+  if (!systeme?.arret_urgence) return null;
+  return (
+    <div className="bg-encre text-white">
+      <p className="mx-auto flex max-w-[1280px] flex-wrap items-center gap-3 px-4 py-2.5 text-[13.5px] sm:px-6">
+        <span className="badge bg-white text-encre">Arrêt d'urgence</span>
+        Aucune relance n'est préparée ni envoyée. Le validateur peut le lever dans Réglages.
+      </p>
+    </div>
   );
 }

@@ -53,7 +53,7 @@ def petit_jeu(conn_prete):
 
 def test_ordre_identique_au_calcul_manuel(petit_jeu):
     # Calcul à la main (poids 0,5 / 0,3 / 0,2 ; plafond 120 j ; seuil 1 000 000 FCFA) :
-    #   E-001 : A = 10/120 = 0,0833 ; S = 1 (plafonné) ; H = 0   → 4,165 + 30   = 34,17 — gros montant : en tête
+    #   E-001 : A = 10/120 = 0,0833 ; S = 1 (plafonné) ; H = 0   → 4,165 + 30   = 34,17 (gros montant : en tête)
     #   C-001 : A = 30/120 = 0,25   ; S = 0,8          ; H = 2/2 → 12,5 + 24 + 20 = 56,50
     #   B-001 : A = 1               ; S = 0,1          ; H = 0   → 50 + 3       = 53,00
     #   D-001 : A = 0,5             ; S = 0,5          ; H = 0   → 25 + 15      = 40,00
@@ -71,7 +71,7 @@ def test_explications(petit_jeu):
         "Priorité 2 : 30 jours de retard, solde de 800 000 FCFA, 2 retards sur 2 factures réglées")
     assert par_numero["B-001"].explication == (
         "Priorité 3 : 120 jours de retard, solde de 100 000 FCFA, aucun historique de règlement")
-    assert par_numero["E-001"].explication.endswith("gros montant, placé en tête pour validation humaine")
+    assert par_numero["E-001"].explication.endswith(". Gros montant, placé en tête pour validation humaine")
     detail = par_numero["C-001"].detail
     assert detail[0] == "Ancienneté : 30 j → facteur 0.2500 × poids 0.5 = 12.50 pts"
     assert detail[3] == "Score total : 56.50 / 100"

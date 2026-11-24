@@ -99,9 +99,9 @@ def libelle(e: dict) -> str:
         "rapprochement_a_valider": lambda: f"Paiement {e['objet_id']} à valider ({ap.get('motif')})",
         "validation_rapprochement": lambda: f"Rapprochement du paiement {e['objet_id']} validé par un humain",
         "annulation_rapprochement": lambda: f"Rapprochement du paiement {e['objet_id']} annulé : {ap.get('motif')}",
-        "preparation_relance": lambda: f"Relance {ap.get('etape')} préparée par {ap.get('canal')} — "
+        "preparation_relance": lambda: f"Relance {ap.get('etape')} préparée par {ap.get('canal')}. "
                                        f"{ap.get('explication', '')}"
-                                       + (" — validation requise : " + "; ".join(ap["raisons"]) if ap.get("raisons") else ""),
+                                       + (". Validation requise : " + "; ".join(ap["raisons"]) if ap.get("raisons") else ""),
         "validation_approuver": lambda: "Relance approuvée par le validateur",
         "validation_modifier": lambda: f"Relance approuvée avec message modifié ({ap.get('motif') or 'sans motif'})",
         "validation_rejeter": lambda: f"Relance rejetée : {ap.get('motif')}",

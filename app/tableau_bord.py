@@ -134,7 +134,7 @@ def _lignes(ind: dict) -> list[tuple[str, str, str]]:
         lignes.append(("Encours", f"Total échu ({d})", v["affiche"]))
     lignes.append(("Encours", "Factures échues", str(ind["encours"]["factures_echues"])))
     for t in ind["tranches"]:
-        lignes.append(("Tranches", t["tranche"], f"{t['nombre']} facture(s) — "
+        lignes.append(("Tranches", t["tranche"], f"{t['nombre']} facture(s) : "
                        + ", ".join(v["affiche"] for v in t["montants"].values())))
     for i, f in enumerate(ind["top10"], 1):
         lignes.append(("Top 10", f"{i}. {f['numero']} ({f['client']})", f"{f['affiche']}, {f['jours_retard']} j"))

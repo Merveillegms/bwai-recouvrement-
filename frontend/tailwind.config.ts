@@ -1,26 +1,31 @@
 import type { Config } from "tailwindcss";
 
-/* Piste « Registre comptable » : papier, encre, filets, tampons. Les couleurs viennent des variables CSS
-   de app/globals.css, pour qu'un seul endroit définisse la palette. */
+/* Charte Recouvra : deux couleurs seulement, l'encre (bleu nuit presque noir) et le vert émeraude,
+   sur des gris neutres légèrement teintés. Pas d'italique, pas de troisième couleur. */
 const config: Config = {
   content: ["./app/**/*.{ts,tsx}", "./components/**/*.{ts,tsx}"],
   theme: {
     extend: {
       colors: {
-        papier: "var(--papier)",
-        "papier-fonce": "var(--papier-fonce)",
-        encre: "var(--encre)",
-        "encre-pale": "var(--encre-pale)",
-        filet: "var(--filet)",
-        lavis: "var(--lavis)",
-        tampon: "var(--tampon)",
-        ok: "var(--ok)",
-        alerte: "var(--alerte)",
+        encre: "#0b1324",
+        "encre-2": "#18233a",
+        "encre-3": "#24314d",
+        vert: "#0e9f6e",
+        "vert-fonce": "#0b8a5f",
+        "vert-pale": "#e7f6f0",
+        fond: "#f6f8fa",
+        doux: "#566074",
+        filet: "#e3e7ed",
+        "filet-2": "#eef1f5",
       },
       fontFamily: {
-        titre: ["Spectral", "Georgia", "serif"],
-        texte: ["IBM Plex Sans", "Segoe UI", "system-ui", "sans-serif"],
-        chiffre: ["IBM Plex Mono", "Consolas", "monospace"],
+        titre: ["Sora", "Segoe UI", "system-ui", "sans-serif"],
+        texte: ["Inter", "Segoe UI", "system-ui", "sans-serif"],
+        chiffre: ["JetBrains Mono", "Consolas", "monospace"],
+      },
+      boxShadow: {
+        carte: "0 1px 2px rgba(11, 19, 36, .04)",
+        flottant: "0 24px 50px -28px rgba(11, 19, 36, .45)",
       },
     },
   },

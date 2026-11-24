@@ -138,28 +138,28 @@
 
 **Sortie** : à partir du seul journal, on explique chaque relance envoyée, bloquée ou annulée. ✅ Prouvé en copiant **uniquement** la table `journal` dans une base vide : le sort de chaque relance (envoyée, annulée avant envoi, rejetée, suspendue, en attente) est reconstitué à l'identique ; 268 tests, couverture 94 %.
 
-### Phase 7 · IA encadrée (bonus, désactivable)
-- [ ] Rédaction : reçoit des champs calculés + gabarit ; valeurs sensibles injectées après génération via marqueurs ; repli sur gabarit fixe
-- [ ] Vérificateur : extraction des montants / dates / références et comparaison exacte ; mots interdits, longueur
-- [ ] Classification des réponses (promesse, paiement, litige, délai, info, sans rapport) avec seuil de confiance ; ne change jamais seule un statut sensible
-- [ ] Évaluation sur 30-50 exemples étiquetés : exactitude, rappel sur litiges, taux de blocage
-- [ ] Protection contre l'injection, minimisation des données, journal entrées/sorties, interrupteur global
+### Phase 7 · IA encadrée ✅ (24/11)
+- [x] Rédaction : Gemini (`gemini-3.5-flash`) ou Hugging Face (Llama) derrière une interface remplaçable ; champs calculés + marqueurs, valeurs insérées par le code ; repli sur le gabarit
+- [x] Vérificateur : marqueurs, aucun chiffre écrit par le modèle, ton, longueur, puis comparaison exacte avec les données calculées
+- [x] Classification locale des réponses (bayésien naïf, hors ligne) + extraction de date ; confirmation humaine obligatoire, litige jamais automatique
+- [x] Évaluation : classification 85 % sur 48 exemples jamais vus, litiges détectés 100 % ; rédaction 6/6 acceptée
+- [x] Protection contre l'injection, minimisation des données, journal des appels IA, interrupteur global
+- [x] Interface : page Réponses clients, badge « Rédigé par l'IA » et retour au gabarit, section IA dans Réglages
+- [x] Fiche IA : [docs/fiche_ia.md](docs/fiche_ia.md)
 
-**Sortie** : 0 message envoyé avec une valeur différente des données calculées.
+**Sortie** : 0 message envoyé avec une valeur différente des données calculées. ✅ Les contrôles rejettent toute valeur écrite par le modèle et le vérificateur repasse avant l'envoi ; 301 tests.
 
 ---
 
-## Partie B — Front-end ✅ (24/11)
+## Partie B · Front-end ✅ (24/11)
 
-> Piste retenue : **Registre comptable** (papier, encre, filets, tampons), sans landing page.
+> Identité « Recouvra » : deux couleurs (encre et vert émeraude), aucune italique, aucun tiret cadratin, page d'accueil animée.
 
-- [x] Next.js + TypeScript + Tailwind ; polices embarquées (fonctionne sans internet) ; proxy `/api` vers FastAPI
-- [x] Types générés depuis l'OpenAPI (`npm run types`) + types des réponses
-- [x] Pages : connexion, Aujourd'hui, validation et envoi, paiements, factures + fiche avec frise, import (correspondance, rapport, anomalies), journal, tableau de bord, réglages
-- [x] Boutons désactivés pendant l'appel + clé d'idempotence envoyée à chaque action
-- [x] Rôles visibles (gestionnaire / validateur / auditeur) ; décisions masquées selon le rôle
-- [x] Contrôles de démo : charger le jeu, avancer l'horloge, simuler un paiement, exécuter la file
-- [x] `python tasks.py demo` lance API + interface ensemble
+- [x] Page d'accueil `/` : animation de la file du jour, résultats mesurés, fonctionnement, garde-fous, IA, contexte Bénin
+- [x] Application `/app` : barre latérale, tuiles, tableaux ; Aujourd'hui, Validation, Paiements, Réponses clients, Factures + fiche et frise, Import, Journal, Tableau de bord, Réglages
+- [x] Next.js + TypeScript + Tailwind ; polices embarquées (hors ligne) ; proxy `/api` vers FastAPI ; types générés depuis l'OpenAPI
+- [x] Aucun calcul côté interface (montants et points du score fournis par l'API) ; clé d'idempotence à chaque action
+- [x] `python tasks.py demo` lance API + interface
 
 ## Partie C — Tests, mesures, livrables
 

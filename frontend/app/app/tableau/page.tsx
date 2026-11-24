@@ -40,30 +40,30 @@ export default function Tableau() {
       {erreur && <Erreur message={erreur} />}
       {chargement && !d ? <Chargement /> : d && (
         <>
-          <section className="grid gap-x-10 gap-y-4 border-y-2 border-encre py-5 sm:grid-cols-3" aria-label="Encours">
+          <section className="grid gap-x-10 gap-y-4 carte px-5 py-5 sm:grid-cols-3" aria-label="Encours">
             <div><p className="etiquette">Échu à recouvrer</p>
               {Object.values(d.encours.total_echu).map((m) => <p key={m.affiche} className="chiffres text-3xl">{m.affiche}</p>)}
-              <p className="text-sm text-encre-pale"><span className="chiffres">{d.encours.factures_echues}</span> factures échues</p></div>
+              <p className="text-sm text-doux"><span className="chiffres">{d.encours.factures_echues}</span> factures échues</p></div>
             <div><p className="etiquette">Total dû (y compris à échoir)</p>
               {Object.values(d.encours.total_du).map((m) => <p key={m.affiche} className="chiffres text-xl">{m.affiche}</p>)}</div>
             <div><p className="etiquette">Recouvré après relance</p>
               {Object.keys(d.efficacite.recouvre_apres_relance).length
                 ? Object.values(d.efficacite.recouvre_apres_relance).map((m) => <p key={m.affiche} className="chiffres text-xl">{m.affiche}</p>)
                 : <p className="chiffres text-xl">0 FCFA</p>}
-              <p className="text-sm text-encre-pale"><span className="chiffres">{d.efficacite.paiements_apres_relance}</span> paiement(s)
+              <p className="text-sm text-doux"><span className="chiffres">{d.efficacite.paiements_apres_relance}</span> paiement(s)
                 {d.efficacite.delai_moyen_jours !== null && <>, en <span className="chiffres">{d.efficacite.delai_moyen_jours}</span> j en moyenne après la relance</>}</p></div>
           </section>
 
           <div className="grid items-start gap-8 lg:grid-cols-2">
             <Tranches d={d} />
             <section className="grid gap-2">
-              <h2 className="text-xl font-semibold">Où agir en premier</h2>
+              <h2 className="text-[16px] font-semibold">Où agir en premier</h2>
               <ol className="grid">
                 {d.top10.map((f, i) => (
                   <li key={f.facture_id} className="grid grid-cols-[1.8rem_minmax(0,1fr)_auto] items-baseline gap-x-3 border-b border-filet py-1.5 text-sm">
-                    <span className="chiffres text-encre-pale">{i + 1}</span>
-                    <span className="min-w-0 truncate"><Link className="hover:underline" href={`/factures/${f.facture_id}`}>{f.client}</Link>
-                      <span className="text-encre-pale"> · {f.jours_retard} j</span></span>
+                    <span className="chiffres text-doux">{i + 1}</span>
+                    <span className="min-w-0 truncate"><Link className="hover:underline" href={`/app/factures/${f.facture_id}`}>{f.client}</Link>
+                      <span className="text-doux"> · {f.jours_retard} j</span></span>
                     <span className="chiffres text-right">{f.affiche}</span>
                   </li>
                 ))}
@@ -73,7 +73,7 @@ export default function Tableau() {
 
           <div className="grid items-start gap-8 lg:grid-cols-3">
             <section className="grid gap-2">
-              <h2 className="text-xl font-semibold">Charge de travail</h2>
+              <h2 className="text-[16px] font-semibold">Charge de travail</h2>
               <dl className="grid gap-1 text-sm">
                 <Ligne libelle="Messages à valider" valeur={d.relances.lots_a_valider} />
                 <Ligne libelle="Relances envoyées" valeur={d.relances.par_statut.envoyee ?? 0} />
@@ -82,7 +82,7 @@ export default function Tableau() {
               </dl>
             </section>
             <section className="grid gap-2">
-              <h2 className="text-xl font-semibold">Efficacité</h2>
+              <h2 className="text-[16px] font-semibold">Efficacité</h2>
               <dl className="grid gap-1 text-sm">
                 {Object.entries(d.efficacite.delai_moyen_par_etape).map(([e, j]) => <Ligne key={e} libelle={`Délai de paiement après ${e}`} valeur={`${j} j`} />)}
                 <Ligne libelle="Promesses tenues" valeur={d.efficacite.promesses.tenues} />
@@ -91,7 +91,7 @@ export default function Tableau() {
               </dl>
             </section>
             <section className="grid gap-2">
-              <h2 className="text-xl font-semibold">Ce qu'ont évité les garde-fous</h2>
+              <h2 className="text-[16px] font-semibold">Ce qu'ont évité les garde-fous</h2>
               <dl className="grid gap-1 text-sm">
                 {Object.entries(GARDE_FOUS).map(([k, v]) => <Ligne key={k} libelle={v} valeur={d.garde_fous[k] as number} />)}
               </dl>
@@ -114,22 +114,22 @@ function Tranches({ d }: { d: Indicateurs }) {
   const max = Math.max(1, ...lignes.map(montant));
   return (
     <section className="grid gap-2">
-      <h2 className="text-xl font-semibold">Où se trouve le risque</h2>
-      <p className="text-sm text-encre-pale">Solde échu par ancienneté du retard (FCFA).</p>
-      <table className="w-full border-collapse text-sm">
+      <h2 className="text-[16px] font-semibold">Où se trouve le risque</h2>
+      <p className="text-sm text-doux">Solde échu par ancienneté du retard (FCFA).</p>
+      <table className="donnees">
         <thead className="sr-only"><tr><th>Ancienneté</th><th>Factures</th><th>Montant</th></tr></thead>
         <tbody>
           {lignes.map((t) => (
             <tr key={t.tranche} className="group" title={`${TRANCHES[t.tranche]} : ${t.nombre} facture(s), ${t.montants.XOF?.affiche ?? "0 FCFA"}`}>
-              <td className="w-28 py-1.5 pr-3 align-middle">{TRANCHES[t.tranche]}</td>
-              <td className="py-1.5 pr-3 align-middle">
-                <div className="h-2.5 w-full bg-papier-fonce">
+              <td className="w-28 align-middle">{TRANCHES[t.tranche]}</td>
+              <td className="align-middle">
+                <div className="h-2.5 w-full bg-filet-2">
                   <div className="h-2.5 rounded-r bg-encre transition-opacity group-hover:opacity-80"
                        style={{ width: `${(montant(t) / max) * 100}%` }} />
                 </div>
               </td>
-              <td className="chiffres w-36 py-1.5 text-right align-middle">{t.montants.XOF?.affiche ?? "0 FCFA"}</td>
-              <td className="chiffres w-10 py-1.5 text-right align-middle text-encre-pale">{t.nombre}</td>
+              <td className="chiffres w-36 text-right align-middle">{t.montants.XOF?.affiche ?? "0 FCFA"}</td>
+              <td className="chiffres w-10 text-right align-middle text-doux">{t.nombre}</td>
             </tr>
           ))}
         </tbody>

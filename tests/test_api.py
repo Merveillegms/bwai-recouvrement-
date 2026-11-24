@@ -278,3 +278,32 @@ def test_audit_tableau_de_bord_et_demo_par_l_api(client):
     assert client.get("/api/tableau-de-bord/export.csv").status_code == 200
     pdf = client.get("/api/tableau-de-bord/export.pdf")
     assert pdf.status_code == 200 and pdf.content.startswith(b"%PDF")
+
+
+def test_ia_par_l_api(client, monkeypatch):
+    import app.api as module_api
+    from tests.test_ia import Adaptatif
+    client.post("/api/demo/charger")
+    client.post("/api/relances/preparer")
+    validateur = _en_tant_que(client, "validateur")
+    monkeypatch.setattr(module_api, "_fournisseur_ia", lambda: None)
+    etat = client.get("/api/ia/etat").json()
+    assert etat["active"] is False and etat["redaction"]["configuree"] is False
+    assert client.post("/api/ia/activer", json={"actif": True}).status_code == 403  # gestionnaire
+    assert client.post("/api/ia/activer", json={"actif": True}, headers=validateur).json()["active"] is True
+    assert client.post("/api/ia/rediger", json={"limite": 2}).json()["code"] == "IA_NON_CONFIGUREE"
+
+    monkeypatch.setattr(module_api, "_fournisseur_ia", lambda: Adaptatif())
+    r = client.post("/api/ia/rediger", json={"limite": 2}).json()
+    assert r["acceptes"] == 2
+    lot = next(l for l in client.get("/api/validation").json()["lots"] if l["redige_par_ia"])
+    assert client.post("/api/validation/gabarit", json={"lot": lot["lot"]}, headers=validateur).status_code == 200
+
+    c = client.get("/api/clients").json()[0]
+    recue = client.post("/api/reponses", json={"client_id": c["id"], "texte": "Je vous paie vendredi sans faute"})
+    assert recue.status_code == 201 and recue.json()["proposition"]["categorie"] == "promesse"
+    entrante = client.get("/api/reponses").json()[0]
+    ok = client.post(f"/api/reponses/{entrante['id']}/confirmer", json={"categorie": "promesse", "date_promise": entrante["date_proposee"]})
+    assert ok.json()["statut"] == "confirmee"
+    assert client.get("/api/etat-systeme").json()["reponses_a_traiter"] == 0
+    assert client.get("/api/ia/appels").json()[0]["fonction"] == "classification"

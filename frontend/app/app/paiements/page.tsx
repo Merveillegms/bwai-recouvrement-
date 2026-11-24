@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { BoutonAction, Chargement, DecisionMotivee, EnTetePage, Erreur, EtatVide, Tampon } from "@/components/ui";
+import { BoutonAction, Chargement, DecisionMotivee, EnTetePage, Erreur, EtatVide } from "@/components/ui";
 import { api } from "@/lib/api";
 import { useApp, useDonnees } from "@/lib/donnees";
 import { date } from "@/lib/libelles";
@@ -58,18 +58,18 @@ function CartePaiement({ p, proposee, factures, lecture, apres }: { p: Paiement;
   const [motif, setMotif] = useState("");
   const ouvertes = factures.filter((f) => f.solde > 0 && f.devise === p.devise && f.statut !== "cloturee");
   return (
-    <li className="grid gap-3 border border-filet bg-[#f8f5ec] p-5">
+    <li className="grid gap-3 carte p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-3">
         <div>
           <p className="chiffres text-lg">{p.montant_affiche}</p>
-          <p className="chiffres text-xs text-encre-pale">{p.id_transaction} · {date(p.date_paiement)} · {p.operateur} · {p.telephone_payeur ?? "téléphone inconnu"}</p>
+          <p className="chiffres text-xs text-doux">{p.id_transaction} · {date(p.date_paiement)} · {p.operateur} · {p.telephone_payeur ?? "téléphone inconnu"}</p>
         </div>
-        <Tampon ton="alerte">À rapprocher</Tampon>
+        <span className="badge-contour">À rapprocher</span>
       </div>
       <p className="text-sm"><span className="etiquette mr-2">Pourquoi</span>{MOTIFS[p.motif_rapprochement ?? ""] ?? p.motif_rapprochement}
         {p.reference_citee && <> · référence citée <span className="chiffres">{p.reference_citee}</span></>}</p>
       {proposee && (
-        <p className="text-sm">Proposition : <Link href={`/factures/${proposee.id}`} className="chiffres underline underline-offset-2">{proposee.numero}</Link>{" "}
+        <p className="text-sm">Proposition : <Link href={`/app/factures/${proposee.id}`} className="chiffres underline underline-offset-2">{proposee.numero}</Link>{" "}
           de {proposee.nom_client}, solde {proposee.solde_affiche}</p>
       )}
       {!lecture && (
@@ -95,7 +95,7 @@ function CartePaiement({ p, proposee, factures, lecture, apres }: { p: Paiement;
               </BoutonAction>
             </>
           )}
-          <DecisionMotivee libelle="Écarter ce paiement" action="Confirmer" variante="danger" placeholder="Pourquoi l'écarter ?"
+          <DecisionMotivee libelle="Écarter ce paiement" action="Confirmer" variante="encre" placeholder="Pourquoi l'écarter ?"
                            onValider={(m) => agir(() => api(`/api/paiements/${p.id}/rejeter`, { corps: { motif: m } }), "Paiement écarté").then(apres)} />
         </div>
       )}

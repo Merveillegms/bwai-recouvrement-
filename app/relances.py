@@ -19,7 +19,7 @@ from collections import defaultdict
 from datetime import datetime, time, timezone
 
 from app import etat as moteur
-from app import gabarits, journal, parametres, priorisation
+from app import garde_fous, gabarits, journal, parametres, priorisation, verrous
 from app.connecteurs import Connecteur, Envoi, connecteur_par_defaut
 from app.db import transaction
 from app.erreurs import ErreurMetier
@@ -91,7 +91,7 @@ def preparer(conn: sqlite3.Connection, auteur: str = "systeme") -> dict:
 
         for (client_id, nature), priorites in sorted(groupes.items()):
             lot = cle_lot(client_id, jour, nature)
-            if conn.execute("SELECT 1 FROM relances WHERE lot_envoi = ?", (lot,)).fetchone():
+            if conn.execute("SELECT 1 FROM relances WHERE lot_envoi = ? AND statut <> 'annulee'", (lot,)).fetchone():
                 resume["ignorees"] += [{"facture_id": p.facture.id, "code": "CLIENT_DEJA_TRAITE_AUJOURDHUI",
                                         "motif": "Un message a déjà été préparé aujourd'hui pour ce client"}
                                        for p in priorites]
@@ -160,57 +160,101 @@ def _decouper(texte: str) -> tuple[str | None, str]:
 
 def envoyer(conn: sqlite3.Connection, auteur: str = "systeme", connecteur: Connecteur | None = None,
             maintenant: datetime | None = None) -> dict:
-    """Envoie les lots entièrement validés. Idempotent : un lot envoyé ne repart jamais."""
+    """Envoie les lots entièrement validés, un par un, sous verrou.
+
+    1. reprise des lots interrompus (garde_fous.reprendre) ;
+    2. pour chaque lot validé, dans une transaction : revalidation (état réel, message), puis passage
+       « en cours d'envoi » et enregistrement du message sortant ;
+    3. appel du connecteur (hors transaction) ;
+    4. dans une transaction : « envoyé » + accusé + journal.
+    Une coupure entre 2 et 4 est rattrapée par l'étape 1 au lancement suivant, sans second envoi.
+    """
     _verifier_arret_urgence(conn)
     if not _dans_la_plage(conn, maintenant):
         plage = parametres.lire(conn, "heures_envoi")
         raise ErreurMetier("HORS_PLAGE_HORAIRE", f"Envoi autorisé entre {plage['debut']} et {plage['fin']} seulement")
     connecteur = connecteur or connecteur_par_defaut()
-    lots = [r["lot_envoi"] for r in conn.execute(
-        "SELECT lot_envoi FROM relances GROUP BY lot_envoi"
-        " HAVING sum(statut <> 'validee') = 0 ORDER BY min(id)")]
-    resume = {"envoyes": 0, "echecs": 0, "lots": []}
-    for lot in lots:
-        with transaction(conn):
-            relances = conn.execute("SELECT * FROM relances WHERE lot_envoi = ? ORDER BY id", (lot,)).fetchall()
-            if not relances or any(r["statut"] != "validee" for r in relances):
-                continue  # modifié entre-temps par un autre traitement
-            client = conn.execute("SELECT * FROM clients WHERE id = ?", (relances[0]["client_id"],)).fetchone()
-            escalade = relances[0]["etape"] == "R5"
-            canal = "email" if escalade else relances[0]["canal"]
-            destinataire = "responsable recouvrement (interne)" if escalade else (
-                client["email"] if canal == "email" else client["telephone"])
-            conn.execute("UPDATE relances SET statut = 'en_cours_envoi', maj_le = ? WHERE lot_envoi = ?",
-                         (_maintenant(), lot))
+    detenteur = verrous.nouveau_detenteur()
+    if not verrous.acquerir(conn, "envoi", detenteur):
+        raise ErreurMetier("TRAITEMENT_EN_COURS", "Un envoi est déjà en cours : réessayez dans un instant")
+    try:
+        resume = {"envoyes": 0, "echecs": 0, "annules": 0, "lots": [], "reprise": garde_fous.reprendre(conn, connecteur)}
+        lots = [r["lot_envoi"] for r in conn.execute(
+            "SELECT lot_envoi FROM relances WHERE statut NOT IN ('annulee') GROUP BY lot_envoi"
+            " HAVING sum(statut <> 'validee') = 0 ORDER BY min(id)")]
+        for lot in lots:
+            _envoyer_lot(conn, lot, auteur, connecteur, resume)
+        return resume
+    finally:
+        verrous.liberer(conn, "envoi", detenteur)
+
+
+def _envoyer_lot(conn, lot: str, auteur: str, connecteur: Connecteur, resume: dict) -> None:
+    with transaction(conn):
+        _verifier_arret_urgence(conn)
+        relances = conn.execute("SELECT * FROM relances WHERE lot_envoi = ? AND statut <> 'annulee' ORDER BY id",
+                                (lot,)).fetchall()
+        if not relances or any(r["statut"] != "validee" for r in relances):
+            return  # modifié entre-temps
+        raisons = garde_fous.revalider_lot(conn, relances)
+        if raisons:
+            garde_fous.annuler_lot(conn, lot, raisons, "systeme", "systeme", "REVALIDATION_AVANT_ENVOI")
+            resume["annules"] += 1
+            return
+        client = conn.execute("SELECT * FROM clients WHERE id = ?", (relances[0]["client_id"],)).fetchone()
+        escalade = relances[0]["etape"] == "R5"
+        canal = "email" if escalade else relances[0]["canal"]
+        destinataire = "responsable recouvrement (interne)" if escalade else (
+            client["email"] if canal == "email" else client["telephone"])
+        conn.execute("UPDATE relances SET statut = 'en_cours_envoi', maj_le = ? WHERE lot_envoi = ? AND statut = 'validee'",
+                     (_maintenant(), lot))
+        existant = conn.execute("SELECT id FROM messages_sortants WHERE cle_envoi = ?", (lot,)).fetchone()
+        if existant:  # nouvel essai après une reprise ou un échec : même clé d'envoi, même ligne
+            message_id = existant["id"]
+            conn.execute("UPDATE messages_sortants SET statut = 'en_attente', contenu = ?, destinataire = ?"
+                         " WHERE id = ?", (relances[0]["message"], destinataire, message_id))
+        else:
             message_id = conn.execute(
                 "INSERT INTO messages_sortants (cle_envoi, client_id, canal, destinataire, contenu, statut)"
                 " VALUES (?,?,?,?,?, 'en_attente')",
                 (lot, client["id"], canal, destinataire, relances[0]["message"])).lastrowid
-            conn.execute("UPDATE relances SET message_id = ? WHERE lot_envoi = ?", (message_id, lot))
-        objet, corps = _decouper(relances[0]["message"])
-        try:
-            accuse = connecteur.envoyer(Envoi(lot, canal, destinataire, objet, corps))
-        except Exception as exc:  # panne du fournisseur : on trace, on n'invente rien
-            with transaction(conn):
-                conn.execute("UPDATE messages_sortants SET statut = 'echec', accuse = ? WHERE id = ?",
-                             (str(exc)[:200], message_id))
-                conn.execute("UPDATE relances SET statut = 'echec', maj_le = ? WHERE lot_envoi = ?", (_maintenant(), lot))
-                journal.ajouter(conn, acteur=auteur, type_acteur="systeme", action="echec_envoi",
-                                objet_type="message", objet_id=message_id, apres={"lot": lot, "erreur": str(exc)[:200]},
-                                regle="ENVOI")
-            resume["echecs"] += 1
-            continue
+        conn.execute("UPDATE relances SET message_id = ? WHERE lot_envoi = ? AND statut = 'en_cours_envoi'",
+                     (message_id, lot))
+    objet, corps = _decouper(relances[0]["message"])
+    try:
+        accuse = connecteur.envoyer(Envoi(lot, canal, destinataire, objet, corps))
+    except Exception as exc:  # panne du fournisseur : on trace, on n'invente rien
         with transaction(conn):
-            conn.execute("UPDATE messages_sortants SET statut = 'envoye', accuse = ?, envoye_le = ? WHERE id = ?",
-                         (accuse, _maintenant(), message_id))
-            conn.execute("UPDATE relances SET statut = 'envoyee', maj_le = ?, date_envoi = ? WHERE lot_envoi = ?",
-                         (_maintenant(), parametres.date_du_jour(conn).isoformat(), lot))
-            journal.ajouter(conn, acteur=auteur, type_acteur="systeme", action="envoi_relance", objet_type="message",
-                            objet_id=message_id,
-                            apres={"lot": lot, "canal": canal, "accuse": accuse, "connecteur": connecteur.nom,
-                                   "relances": [r["id"] for r in relances],
-                                   "factures": [r["facture_id"] for r in relances]},
-                            regle="ENVOI")
-        resume["envoyes"] += 1
-        resume["lots"].append(lot)
-    return resume
+            conn.execute("UPDATE messages_sortants SET statut = 'echec', accuse = ? WHERE id = ?",
+                         (str(exc)[:200], message_id))
+            conn.execute("UPDATE relances SET statut = 'echec', maj_le = ? WHERE lot_envoi = ? AND statut = 'en_cours_envoi'",
+                         (_maintenant(), lot))
+            journal.ajouter(conn, acteur=auteur, type_acteur="systeme", action="echec_envoi", objet_type="message",
+                            objet_id=message_id, apres={"lot": lot, "erreur": str(exc)[:200]}, regle="ENVOI")
+        resume["echecs"] += 1
+        return
+    with transaction(conn):
+        conn.execute("UPDATE messages_sortants SET statut = 'envoye', accuse = ?, envoye_le = ? WHERE id = ?",
+                     (accuse, _maintenant(), message_id))
+        conn.execute("UPDATE relances SET statut = 'envoyee', maj_le = ?, date_envoi = ?"
+                     " WHERE lot_envoi = ? AND statut = 'en_cours_envoi'",
+                     (_maintenant(), parametres.date_du_jour(conn).isoformat(), lot))
+        journal.ajouter(conn, acteur=auteur, type_acteur="systeme", action="envoi_relance", objet_type="message",
+                        objet_id=message_id,
+                        apres={"lot": lot, "canal": canal, "accuse": accuse, "connecteur": connecteur.nom,
+                               "relances": [r["id"] for r in relances],
+                               "factures": [r["facture_id"] for r in relances]},
+                        regle="ENVOI")
+    resume["envoyes"] += 1
+    resume["lots"].append(lot)
+
+
+def reessayer(conn: sqlite3.Connection, lot: str, auteur: str) -> None:
+    """Remet en file un lot en échec (panne du fournisseur). Il sera revalidé avant le nouvel envoi."""
+    with transaction(conn):
+        n = conn.execute("UPDATE relances SET statut = 'validee', maj_le = ? WHERE lot_envoi = ? AND statut = 'echec'",
+                         (_maintenant(), lot)).rowcount
+        if not n:
+            raise ErreurMetier("NON_APPLICABLE", "Aucune relance en échec dans ce lot")
+        journal.ajouter(conn, acteur=auteur, type_acteur="humain", action="nouvel_essai_envoi", objet_type="lot",
+                        objet_id=lot, regle="ENVOI")

@@ -110,20 +110,22 @@
 
 **Sortie** : chaque facture éligible génère le bon message, à la bonne étape, une seule fois. ✅ Vérifié sur tout le jeu de démo (une relance par facture éligible, étape exacte, valeurs du message identiques aux données calculées, idempotent) ; 233 tests, couverture 93 %.
 
-### Phase 5 · Garde-fous
-- [ ] Revalidation juste avant envoi (version de la facture) ; annulation journalisée si l'état a changé
-- [ ] Vérification que le message ne contient que les valeurs calculées
-- [ ] File de validation humaine : litige, gros montant, R3-R5, client sensible, donnée incertaine, message IA
-- [ ] Actions : approuver / modifier / suspendre / rejeter (motif obligatoire) ; message modifié revérifié
-- [ ] Idempotence : clé = facture + étape + canal + période, `UNIQUE` en base, même transaction
-- [ ] Verrou contre deux traitements concurrents
-- [ ] États : brouillon → à valider → validée → en cours d'envoi → envoyée / échec / annulée
-- [ ] Reprise au démarrage des relances « en cours d'envoi » (vérification de l'accusé simulé)
-- [ ] Test qui tue le processus à chaque étape et vérifie l'absence de doublon
-- [ ] Rôles : gestionnaire, validateur, auditeur (comptes de test) ; masquage des téléphones
-- [ ] Arrêt d'urgence global journalisé
+### Phase 5 · Garde-fous ✅ (24/11)
+- [x] Revalidation juste avant l'envoi et à l'approbation (version, solde, statut, paiement en attente, promesse) ; annulation journalisée
+- [x] Vérification que le message ne contient que les valeurs calculées (numéros, soldes, références ; aucun montant inventé)
+- [x] File de validation humaine : litige, gros montant, R3-R5, client sensible, donnée incertaine, message non conforme
+- [x] Actions : approuver / modifier / suspendre / rejeter (motif obligatoire) ; message modifié revérifié
+- [x] Validation groupée des lots ordinaires (R3 seule raison), chaque lot revalidé et journalisé
+- [x] Idempotence : clé facture + étape + échéance, `UNIQUE` en base, même transaction ; anti double-clic `Idempotency-Key`
+- [x] Verrou contre deux envois concurrents, repris si le processus détenteur est mort
+- [x] États : brouillon → à valider → validée → en cours d'envoi → envoyée / échec / annulée
+- [x] Reprise au démarrage des lots « en cours d'envoi » via l'accusé du connecteur
+- [x] Test qui tue un vrai processus en pleine file (3 instants) et vérifie l'absence de doublon
+- [x] Sessions (PBKDF2, jeton 8 h) ; rôles gestionnaire / validateur / auditeur ; téléphones masqués pour l'auditeur
+- [x] Arrêt d'urgence global journalisé (validateur, motif obligatoire)
+- [ ] Base chiffrée : non (limite documentée)
 
-**Sortie** : « je tue le programme en pleine file, je relance, aucun doublon » réussit à chaque essai.
+**Sortie** : « je tue le programme en pleine file d'envoi, je le relance, aucune relance en double » fonctionne à chaque essai. ✅ Coupures à 0,8 / 1,6 / 2,7 s : cas « tué avant l'envoi » (remis en file) et « tué après l'envoi, avant l'enregistrement » (confirmé sans renvoi) couverts ; 259 tests, couverture 94 %.
 **→ Contrat d'API figé, le front peut démarrer.**
 
 ### Phase 6 · Journal, audit, indicateurs (API)

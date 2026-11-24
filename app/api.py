@@ -1,21 +1,28 @@
 """API FastAPI consommée par le frontend. Le frontend n'effectue aucun calcul : tout passe par ici.
 
-Authentification : provisoire (en-tête X-Utilisateur), remplacée par de vraies sessions en phase 5.
+Authentification : POST /api/auth/connexion renvoie un jeton, à passer ensuite dans l'en-tête
+« Authorization: Bearer <jeton> ». Rôles : gestionnaire (prépare), validateur (décide), auditeur (lecture
+seule, numéros de téléphone masqués).
+Anti double-clic : toute requête POST/PUT peut porter un en-tête « Idempotency-Key » ; la même clé rejoue
+la même réponse sans refaire l'action.
 Erreurs : toujours {"code", "message", "details"} avec un message lisible, jamais de trace technique.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
 from collections.abc import Iterator
 from dataclasses import asdict
+from datetime import datetime, timezone
 
 from fastapi import Depends, FastAPI, File, Form, Header, Request, UploadFile
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
 from app import etat as moteur
-from app import fiche, importer, parametres, priorisation, rapprochement, relances, reponses, resolution, statuts
+from app import (auth, fiche, importer, parametres, priorisation, rapprochement, relances, reponses, resolution,
+                 statuts, validation)
 from app.db import connecter, version_schema
 from app.erreurs import ErreurMetier
 from app.montants import depuis_unites_mineures
@@ -44,7 +51,8 @@ def _import_refuse(_: Request, e: importer.ImportRefuse) -> JSONResponse:
 
 _STATUTS_ERREURS = {"INTROUVABLE": 404, "DEJA_RESOLUE": 409, "DEJA_CLOTUREE": 409, "FACTURE_ENGAGEE": 409,
                     "CLIENT_EN_ATTENTE": 409, "TRANSITION_INTERDITE": 409, "DECISION_HUMAINE_REQUISE": 409,
-                    "NON_APPLICABLE": 409, "ARRET_URGENCE": 423, "HORS_PLAGE_HORAIRE": 409}
+                    "NON_APPLICABLE": 409, "ARRET_URGENCE": 423, "HORS_PLAGE_HORAIRE": 409,
+                    "TRAITEMENT_EN_COURS": 409, "IDENTIFIANTS_INVALIDES": 401, "VALIDATEUR_REQUIS": 403}
 
 
 @app.exception_handler(ErreurMetier)
@@ -61,12 +69,26 @@ def base() -> Iterator[sqlite3.Connection]:
         conn.close()
 
 
-def utilisateur(x_utilisateur: str = Header(default="gestionnaire"), conn: sqlite3.Connection = Depends(base)) -> dict:
-    ligne = conn.execute("SELECT identifiant, nom, role FROM utilisateurs WHERE identifiant = ? AND actif = 1",
-                         (x_utilisateur,)).fetchone()
-    if ligne is None:
-        raise ErreurApi(401, "NON_AUTHENTIFIE", "Utilisateur inconnu ou inactif")
-    return dict(ligne)
+def _jeton(authorization: str | None) -> str | None:
+    if authorization and authorization.lower().startswith("bearer "):
+        return authorization[7:].strip() or None
+    return None
+
+
+def utilisateur(authorization: str | None = Header(default=None), conn: sqlite3.Connection = Depends(base)) -> dict:
+    jeton = _jeton(authorization)
+    u = auth.utilisateur_du_jeton(conn, jeton) if jeton else None
+    if u is None:
+        raise ErreurApi(401, "NON_AUTHENTIFIE", "Session absente ou expirée : reconnectez-vous")
+    return u
+
+
+def _masquer(u: dict, ligne: dict, *champs: str) -> dict:
+    """L'auditeur ne voit pas les numéros de téléphone en clair."""
+    if u["role"] == "auditeur":
+        for champ in champs:
+            ligne[champ] = auth.masquer_telephone(ligne.get(champ))
+    return ligne
 
 
 def _ecriture_autorisee(u: dict) -> None:
@@ -86,10 +108,65 @@ async def _lire_fichier(fichier: UploadFile) -> bytes:
     return contenu
 
 
+# ------------------------------------------------------------------- anti double-clic
+@app.middleware("http")
+async def requetes_idempotentes(request: Request, call_next):
+    """Même « Idempotency-Key » (par utilisateur) → même réponse, l'action n'est pas rejouée."""
+    cle = request.headers.get("idempotency-key")
+    jeton = _jeton(request.headers.get("authorization"))
+    if request.method not in ("POST", "PUT") or not cle or not jeton:
+        return await call_next(request)
+    proprietaire = hashlib.sha256(jeton.encode()).hexdigest()[:16]
+    conn = connecter()
+    try:
+        deja = conn.execute("SELECT * FROM requetes_idempotentes WHERE cle = ? AND utilisateur = ?",
+                            (cle[:100], proprietaire)).fetchone()
+        if deja is not None:
+            if (deja["methode"], deja["chemin"]) != (request.method, request.url.path):
+                return JSONResponse(status_code=422, content={
+                    "code": "CLE_DEJA_UTILISEE", "message": "Clé d'idempotence déjà utilisée pour une autre action",
+                    "details": {}})
+            return Response(deja["reponse"], status_code=deja["statut_http"], media_type=deja["type_contenu"],
+                            headers={"Idempotent-Replay": "true"})
+        reponse = await call_next(request)
+        corps = b"".join([morceau async for morceau in reponse.body_iterator])
+        if reponse.status_code < 500:
+            conn.execute("INSERT OR IGNORE INTO requetes_idempotentes VALUES (?,?,?,?,?,?,?,?)",
+                         (cle[:100], proprietaire, request.method, request.url.path, reponse.status_code, corps,
+                          reponse.headers.get("content-type"), datetime.now(timezone.utc).isoformat()))
+        return Response(corps, status_code=reponse.status_code, headers=dict(reponse.headers))
+    finally:
+        conn.close()
+
+
 # --------------------------------------------------------------------------- santé
 @app.get("/api/sante")
 def sante(conn: sqlite3.Connection = Depends(base)) -> dict:
     return {"statut": "ok", "schema": version_schema(conn)}
+
+
+# ------------------------------------------------------------------ authentification
+class Identifiants(BaseModel):
+    identifiant: str
+    mot_de_passe: str
+
+
+@app.post("/api/auth/connexion")
+def connexion(corps: Identifiants, conn: sqlite3.Connection = Depends(base)) -> dict:
+    jeton, u = auth.connexion(conn, corps.identifiant, corps.mot_de_passe)
+    return {"jeton": jeton, "utilisateur": u, "expire_dans_s": int(auth.DUREE_SESSION.total_seconds())}
+
+
+@app.post("/api/auth/deconnexion")
+def deconnexion(authorization: str | None = Header(default=None), conn: sqlite3.Connection = Depends(base)) -> dict:
+    if jeton := _jeton(authorization):
+        auth.deconnexion(conn, jeton)
+    return {"statut": "ok"}
+
+
+@app.get("/api/auth/moi")
+def moi(u: dict = Depends(utilisateur)) -> dict:
+    return u
 
 
 # -------------------------------------------------------------------------- imports
@@ -202,7 +279,7 @@ def annuler(facture_id: int, corps: Motif, conn: sqlite3.Connection = Depends(ba
 def lister_clients(en_attente: bool = False, conn: sqlite3.Connection = Depends(base),
                    u: dict = Depends(utilisateur)) -> list[dict]:
     filtre = " WHERE statut_validation = 'en_attente'" if en_attente else ""
-    return [dict(r) for r in conn.execute("SELECT * FROM clients" + filtre + " ORDER BY code")]
+    return [_masquer(u, dict(r), "telephone") for r in conn.execute("SELECT * FROM clients" + filtre + " ORDER BY code")]
 
 
 @app.post("/api/clients/{client_id}/valider")
@@ -314,7 +391,7 @@ def lister_paiements(statut: str | None = None, conn: sqlite3.Connection = Depen
     sql, params = "SELECT * FROM paiements", ()
     if statut:
         sql, params = sql + " WHERE statut_rapprochement = ?", (statut,)
-    return [dict(p) for p in conn.execute(sql + " ORDER BY id", params)]
+    return [_masquer(u, dict(p), "telephone_payeur") for p in conn.execute(sql + " ORDER BY id", params)]
 
 
 @app.post("/api/rapprochement")
@@ -457,7 +534,7 @@ def envoyer_relances(conn: sqlite3.Connection = Depends(base), u: dict = Depends
 
 @app.get("/api/messages")
 def messages_sortants(conn: sqlite3.Connection = Depends(base), u: dict = Depends(utilisateur)) -> list[dict]:
-    return [dict(m) for m in conn.execute("SELECT * FROM messages_sortants ORDER BY id DESC")]
+    return [_masquer(u, dict(m), "destinataire") for m in conn.execute("SELECT * FROM messages_sortants ORDER BY id DESC")]
 
 
 @app.get("/api/factures/{facture_id}/fiche-paiement.pdf")
@@ -481,3 +558,76 @@ def enregistrer_reponse(client_id: int, corps: ReponseClient, conn: sqlite3.Conn
     rid = reponses.enregistrer(conn, client_id, corps.type, u["identifiant"], facture_id=corps.facture_id,
                                date_promise=corps.date_promise, texte=corps.texte)
     return {"id": rid}
+
+
+# ---------------------------------------------------------------------- validation
+class DecisionLot(BaseModel):
+    lot: str
+    contenu: str | None = None
+    motif: str | None = None
+
+
+class LotsGroupes(BaseModel):
+    lots: list[str]
+    motif: str | None = None
+
+
+@app.get("/api/validation")
+def file_validation(conn: sqlite3.Connection = Depends(base), u: dict = Depends(utilisateur)) -> dict:
+    return {"lots": validation.file_de_validation(conn), "groupables": validation.lots_groupables(conn)}
+
+
+@app.post("/api/validation/approuver")
+def approuver_lot(corps: DecisionLot, conn: sqlite3.Connection = Depends(base), u: dict = Depends(utilisateur)) -> dict:
+    return validation.approuver(conn, corps.lot, u, corps.contenu, corps.motif)
+
+
+@app.post("/api/validation/rejeter")
+def rejeter_lot(corps: DecisionLot, conn: sqlite3.Connection = Depends(base), u: dict = Depends(utilisateur)) -> dict:
+    return validation.rejeter(conn, corps.lot, u, corps.motif)
+
+
+@app.post("/api/validation/suspendre")
+def suspendre_lot(corps: DecisionLot, conn: sqlite3.Connection = Depends(base), u: dict = Depends(utilisateur)) -> dict:
+    return validation.suspendre(conn, corps.lot, u, corps.motif)
+
+
+@app.post("/api/validation/approuver-groupe")
+def approuver_groupe(corps: LotsGroupes, conn: sqlite3.Connection = Depends(base),
+                     u: dict = Depends(utilisateur)) -> dict:
+    return validation.approuver_groupe(conn, corps.lots, u, corps.motif)
+
+
+class Lot(BaseModel):
+    lot: str
+
+
+@app.post("/api/relances/reessayer")
+def reessayer_lot(corps: Lot, conn: sqlite3.Connection = Depends(base), u: dict = Depends(utilisateur)) -> dict:
+    _ecriture_autorisee(u)
+    relances.reessayer(conn, corps.lot, u["identifiant"])
+    return {"statut": "ok"}
+
+
+# ---------------------------------------------------------------- arrêt d'urgence
+class ArretUrgence(BaseModel):
+    actif: bool
+    motif: str | None = None
+
+
+@app.post("/api/arret-urgence")
+def arret_urgence(corps: ArretUrgence, conn: sqlite3.Connection = Depends(base), u: dict = Depends(utilisateur)) -> dict:
+    """Suspend (ou rétablit) toute préparation et tout envoi, en un clic, avec motif journalisé."""
+    _validateur_requis(u)
+    if corps.actif and not (corps.motif or "").strip():
+        raise ErreurApi(422, "MOTIF_OBLIGATOIRE", "Indiquez le motif de l'arrêt d'urgence")
+    parametres.ecrire(conn, "arret_urgence", corps.actif, u["identifiant"])
+    return {"arret_urgence": corps.actif}
+
+
+@app.get("/api/etat-systeme")
+def etat_systeme(conn: sqlite3.Connection = Depends(base), u: dict = Depends(utilisateur)) -> dict:
+    compte = {r["statut"]: r["n"] for r in conn.execute("SELECT statut, count(*) AS n FROM relances GROUP BY statut")}
+    return {"date_du_jour": parametres.date_du_jour(conn).isoformat(),
+            "arret_urgence": parametres.lire(conn, "arret_urgence"), "ia_active": parametres.lire(conn, "ia_active"),
+            "relances": compte, "verrous": [dict(v) for v in conn.execute("SELECT nom, acquis_le, expire_le FROM verrous")]}

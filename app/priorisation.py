@@ -222,8 +222,15 @@ def file_du_jour(conn: sqlite3.Connection, poids: dict[str, Decimal] | None = No
     hists = historiques(conn, ctx, tous)
     faites: dict[int, set[str]] = {}
     derniere: dict[int, str] = {}
+    rejetees: dict[int, set[str]] = {}
+    for r in conn.execute("SELECT facture_id, etape FROM relances WHERE statut = 'annulee'"
+                          " AND motif_annulation LIKE 'Rejet :%'"):
+        rejetees.setdefault(r["facture_id"], set()).add(r["etape"])
+    paiement_en_attente = {r[0] for r in conn.execute(
+        "SELECT DISTINCT facture_proposee_id FROM paiements WHERE facture_proposee_id IS NOT NULL"
+        " AND statut_rapprochement IN ('a_valider', 'non_rapproche')")}
     en_attente = {r[0] for r in conn.execute(
-        "SELECT DISTINCT facture_id FROM relances WHERE statut IN ('brouillon', 'a_valider', 'validee')")}
+        "SELECT DISTINCT facture_id FROM relances WHERE statut IN ('brouillon', 'a_valider', 'validee', 'echec')")}
     for r in conn.execute("SELECT facture_id, etape, coalesce(date_envoi, date_preparation) AS d FROM relances"
                           " WHERE statut IN ('envoyee', 'en_cours_envoi')"):
         faites.setdefault(r["facture_id"], set()).add(r["etape"])
@@ -235,8 +242,16 @@ def file_du_jour(conn: sqlite3.Connection, poids: dict[str, Decimal] | None = No
     for e in tous:
         hist = hists.get(e.client_id, Historique())
         exclusion = _exclusion(e, hist, faites.get(e.id, set()), derniere.get(e.id), sequence, delai, ctx)
+        if exclusion is None and e.id in paiement_en_attente:
+            exclusion = Exclusion(e, "PAIEMENT_EN_ATTENTE",
+                                  "Un paiement reçu attend d'être rapproché de cette facture : ne pas relancer")
         if exclusion is None and e.id in en_attente:
             exclusion = Exclusion(e, "RELANCE_EN_ATTENTE", "Une relance préparée attend validation ou envoi")
+        if exclusion is None:
+            prochaine = etape_due(e.jours_retard, sequence, faites.get(e.id, set()))
+            if prochaine and prochaine["etape"] in rejetees.get(e.id, set()):
+                exclusion = Exclusion(e, "ETAPE_REJETEE",
+                                      f"Relance {prochaine['etape']} rejetée par le validateur : attendre l'étape suivante")
         if exclusion:
             exclues.append(exclusion)
             continue

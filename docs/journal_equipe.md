@@ -21,3 +21,7 @@ Décisions techniques et métier, dans l'ordre où elles ont été prises.
 | 2026-11-24 | Clé d'idempotence facture + étape + échéance (sans le canal) | Une étape ne part jamais deux fois, même sur deux canaux |
 | 2026-11-24 | Validation humaine décidée par lot (un message par client et par jour) | Jamais de message en deux morceaux |
 | 2026-11-24 | Fiche PDF avec fpdf2 (LGPL-3.0, utilisée comme bibliothèque) | Simple, sans dépendance système |
+| 2026-11-24 | Validation : option (a) — validation par lot + validation groupée des lots R3 ordinaires | Charge réduite sans affaiblir la règle |
+| 2026-11-24 | Annulation automatique = clé d'idempotence libérée ; rejet humain = clé conservée | Relancer avec les nouvelles valeurs, mais respecter un refus |
+| 2026-11-24 | Facture visée par un paiement en attente de rapprochement : jamais relancée | Ne pas relancer un client qui vient de payer |
+| 2026-11-24 | Base SQLite non chiffrée (limite documentée) | SQLCipher impose une dépendance système |

@@ -275,3 +275,56 @@ Gros montant, client sensible, client sans contact, étape R3 à R5.
 
 Phrase par gabarit, sans IA : « Priorité 3 : 45 jours de retard, solde de 320 000 FCFA, 2 retards sur
 3 factures réglées », et détail du calcul facteur par facteur.
+
+## 11. Garde-fous
+
+### Revalidation (juste avant l'envoi, et à l'approbation)
+
+Pour chaque facture du lot, l'état réel est relu et comparé à celui de la préparation. Le lot est **annulé**
+(raison journalisée, aucun message) si :
+
+- la version de la facture a changé (paiement, avoir, litige, suspension, correction…) ou son solde ;
+- son statut n'est plus « échue » ou « partiellement payée » ;
+- une donnée est à vérifier, ou un paiement reçu attend d'être rapproché de cette facture ;
+- le client a fait une promesse de paiement en cours ;
+- le message ne correspond plus exactement aux données calculées : chaque numéro, solde et référence doit
+  y figurer, aucun autre montant ni référence n'est toléré ; ton et longueur conformes.
+
+Une annulation automatique libère la clé d'idempotence : la facture, toujours due, pourra être relancée à la
+même étape avec ses nouvelles valeurs. Les factures visées par un paiement en attente de rapprochement ne sont
+d'ailleurs même pas proposées (`PAIEMENT_EN_ATTENTE`).
+
+### Validation humaine (rôle validateur)
+
+| Décision | Effet |
+|---|---|
+| Approuver | revalidation, puis lot « validé » ; refusé si le message doit être corrigé |
+| Modifier | le nouveau texte repasse par la vérification automatique ; refusé s'il contient une valeur fausse |
+| Suspendre (motif) | lot annulé, factures suspendues |
+| Rejeter (motif) | lot annulé ; l'étape n'est plus proposée pour ces factures (`ETAPE_REJETEE`) |
+| Validation groupée | approuve d'un coup les lots dont le **seul** motif est l'étape R3 ; chaque lot est revalidé et journalisé |
+
+Chaque décision enregistre le décideur, l'heure et le contenu exact approuvé (table `validations`, empreinte
+du contenu au journal).
+
+### Envoi, idempotence et reprise
+
+1. Verrou `envoi` : un seul envoi à la fois ; un verrou laissé par un processus mort est repris immédiatement.
+2. Reprise : chaque lot resté « en cours d'envoi » est vérifié auprès du connecteur (accusé par clé d'envoi) :
+   envoyé → confirmé ; non envoyé → remis en file et revalidé. **Jamais de second envoi.**
+3. Pour chaque lot validé : revalidation, passage « en cours d'envoi » et enregistrement du message sortant
+   (une transaction), appel du connecteur, puis « envoyé » + accusé (une transaction).
+4. Panne du fournisseur : lot « en échec », relançable à la main (« nouvel essai »), revalidé avant l'envoi.
+
+Testé par une coupure brutale d'un vrai processus à plusieurs instants (avant un envoi, et après un envoi mais
+avant son enregistrement).
+
+### Accès
+
+- Connexion par identifiant et mot de passe (PBKDF2), jeton de session de 8 h (seule son empreinte est stockée).
+- Gestionnaire : importe, prépare, envoie, saisit les réponses. Validateur : décide (validation, litige levé,
+  avoir, perte, poids, arrêt d'urgence). Auditeur : lecture seule, téléphones masqués.
+- Anti double-clic : en-tête `Idempotency-Key` ; la même clé rejoue la même réponse sans refaire l'action.
+- Arrêt d'urgence : un clic (validateur, motif obligatoire) bloque toute préparation et tout envoi.
+- Le journal ne contient aucun numéro de téléphone.
+- Limite connue : la base SQLite n'est pas chiffrée (protéger le poste : chiffrement du disque, session Windows).

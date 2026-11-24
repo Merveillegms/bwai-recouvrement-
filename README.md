@@ -23,6 +23,8 @@ python tasks.py reset   # remet base et données à zéro
 
 ## Comptes de test
 
+Connexion : `POST /api/auth/connexion` puis en-tête `Authorization: Bearer <jeton>`.
+
 | Identifiant | Mot de passe | Rôle |
 |---|---|---|
 | gestionnaire | demo-gestionnaire | prépare les relances |

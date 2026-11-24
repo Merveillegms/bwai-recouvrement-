@@ -8,16 +8,18 @@ from __future__ import annotations
 import json
 import sqlite3
 from collections.abc import Iterator
+from dataclasses import asdict
 
 from fastapi import Depends, FastAPI, File, Form, Header, Request, UploadFile
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 
 from app import etat as moteur
-from app import importer, rapprochement, resolution, statuts
+from app import importer, parametres, priorisation, rapprochement, resolution, statuts
 from app.db import connecter, version_schema
 from app.erreurs import ErreurMetier
-from app.normalisation import ErreurValeur, lire_montant
+from app.montants import depuis_unites_mineures
+from app.normalisation import ErreurValeur, lire_decimal, lire_montant
 
 app = FastAPI(title="Recouvrement BWAI", version="0.2.0")
 
@@ -341,4 +343,83 @@ def annuler_rapprochement(paiement_id: int, corps: Motif, conn: sqlite3.Connecti
                           u: dict = Depends(utilisateur)) -> dict:
     _validateur_requis(u)
     rapprochement.annuler_rapprochement(conn, paiement_id, u["identifiant"], corps.motif)
+    return {"statut": "ok"}
+
+
+# -------------------------------------------------------------------- priorisation
+@app.get("/api/aujourdhui")
+def file_aujourdhui(tranche: str | None = None, client: str | None = None, montant_min: str | None = None,
+                    montant_max: str | None = None, etape: str | None = None, validation: bool | None = None,
+                    conn: sqlite3.Connection = Depends(base), u: dict = Depends(utilisateur)) -> dict:
+    """File de travail du jour, triée et expliquée, et factures écartées avec leur motif."""
+    try:
+        bornes = [lire_decimal(m) if m else None for m in (montant_min, montant_max)]
+    except ErreurValeur as err:
+        raise ErreurApi(422, err.code, err.message) from None
+    ctx = moteur.contexte(conn)
+    file, exclues = priorisation.file_du_jour(conn, ctx=ctx)
+
+    def garde(p: priorisation.Priorite) -> bool:
+        solde = depuis_unites_mineures(p.facture.solde, p.facture.decimales)
+        return ((not tranche or p.facture.tranche == tranche) and (not client or p.facture.code_client == client.upper())
+                and (not etape or p.etape["etape"] == etape)
+                and (validation is None or p.validation_humaine == validation)
+                and (bornes[0] is None or solde >= bornes[0]) and (bornes[1] is None or solde <= bornes[1]))
+
+    retenues = [p for p in file if garde(p)]
+    return {
+        "date_reference": ctx.reference.isoformat(),
+        "resume": {"a_relancer": len(file), "validation_humaine": sum(p.validation_humaine for p in file),
+                   "exclues": len(exclues), "affichees": len(retenues)},
+        "file": [p.en_dict() for p in retenues],
+        "exclues": [x.en_dict() for x in exclues if not client or x.facture.code_client == client.upper()],
+    }
+
+
+@app.get("/api/factures/{facture_id}/priorite")
+def pourquoi_cette_facture(facture_id: int, conn: sqlite3.Connection = Depends(base),
+                           u: dict = Depends(utilisateur)) -> dict:
+    """« Pourquoi cette facture est-elle ici ? » : son rang et le détail du calcul, ou le motif de son exclusion."""
+    file, exclues = priorisation.file_du_jour(conn)
+    for p in file:
+        if p.facture.id == facture_id:
+            return {"dans_la_file": True} | p.en_dict()
+    for x in exclues:
+        if x.facture.id == facture_id:
+            return {"dans_la_file": False} | x.en_dict()
+    raise ErreurApi(404, "INTROUVABLE", "Facture introuvable")
+
+
+@app.get("/api/clients/{client_id}/historique")
+def historique_client(client_id: int, conn: sqlite3.Connection = Depends(base), u: dict = Depends(utilisateur)) -> dict:
+    ctx = moteur.contexte(conn)
+    factures = moteur.etats(conn, "f.client_id = ?", (client_id,), ctx)
+    if not factures:
+        raise ErreurApi(404, "INTROUVABLE", "Client introuvable ou sans facture")
+    hist = priorisation.historiques(conn, ctx, factures).get(client_id, priorisation.Historique())
+    return {"historique": asdict(hist), "factures": [e.en_dict() for e in factures]}
+
+
+class Poids(BaseModel):
+    anciennete: str
+    solde: str
+    historique: str
+
+
+@app.post("/api/priorisation/simulation")
+def simuler_poids(corps: Poids, conn: sqlite3.Connection = Depends(base), u: dict = Depends(utilisateur)) -> list[dict]:
+    try:
+        return priorisation.simuler(conn, corps.model_dump())
+    except (ValueError, ArithmeticError):
+        raise ErreurApi(422, "POIDS_INVALIDES", "Les poids doivent être des nombres positifs de somme 1") from None
+
+
+@app.put("/api/parametres/poids_priorite")
+def modifier_poids(corps: Poids, conn: sqlite3.Connection = Depends(base), u: dict = Depends(utilisateur)) -> dict:
+    _validateur_requis(u)
+    try:
+        priorisation.lire_poids(corps.model_dump())
+    except (ValueError, ArithmeticError):
+        raise ErreurApi(422, "POIDS_INVALIDES", "Les poids doivent être des nombres positifs de somme 1") from None
+    parametres.ecrire(conn, "poids_priorite", {k: float(v) for k, v in corps.model_dump().items()}, u["identifiant"])
     return {"statut": "ok"}

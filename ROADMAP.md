@@ -88,15 +88,16 @@
 
 **Sortie** : 100 % des cas donnent le bon statut et le bon retard ; couverture du moteur > 90 %. ✅ 115 factures et 34 paiements conformes à l'oracle (statut, retard, tranche, solde, trop-perçu, drapeaux, rapprochement) ; couverture du moteur 96 % ; 160 tests.
 
-### Phase 3 · Priorisation
-- [ ] Score = somme pondérée (ancienneté, solde, historique de retard) ; poids dans `parametres`
-- [ ] Hiérarchie documentée : litige exclu → gros montant vers l'humain → ancienneté ↓ → solde ↓
-- [ ] Départage stable (numéro de facture)
-- [ ] Historique client chiffré, sans étiquette « mauvais payeur »
-- [ ] Explication par gabarit : « Priorité 3 : 45 jours de retard, solde 320 000 FCFA, 2 retards précédents »
-- [ ] Endpoint file « Aujourd'hui » avec filtres et exclusions (payée, litige, suspendue, relance récente)
+### Phase 3 · Priorisation ✅ (24/11)
+- [x] Score = somme pondérée (ancienneté, solde, historique de retard), en `Decimal` ; poids et plafond dans `parametres`
+- [x] Hiérarchie documentée : exclusions → gros montants en tête → score ↓ → retard ↓ → solde ↓
+- [x] Départage stable (numéro de facture)
+- [x] Historique client chiffré, sans étiquette « mauvais payeur »
+- [x] Explication par gabarit + détail du calcul facteur par facteur ; « pourquoi cette facture est-elle ici ? »
+- [x] File « Aujourd'hui » : étape proposée, validation humaine signalée, filtres (tranche, client, montant, étape), exclusions motivées (payée, litige, suspendue, à vérifier, promesse, relance récente, étape déjà faite)
+- [x] Bonus : simulation de nouveaux poids sans enregistrement ; modification réservée au validateur
 
-**Sortie** : ordre identique au calcul manuel ; chaque rang a son explication.
+**Sortie** : ordre identique au calcul manuel ; chaque rang a son explication. ✅ Jeu de 5 factures calculé à la main reproduit exactement ; propriétés (score borné, monotone) ; aucune facture oubliée ni comptée deux fois sur le jeu de démo ; 173 tests, couverture 93 %.
 
 ### Phase 4 · Relances
 - [ ] Séquence réglable : R0 (−3 j) · R1 (+1-3 j) · R2 (+10-15 j) · R3 (+30 j, humain) · R4 (+45-60 j, humain) · R5 (+90 j, escalade)

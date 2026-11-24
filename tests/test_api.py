@@ -97,3 +97,35 @@ def test_parcours_paiements_et_statuts(client):
     detail = client.get(f"/api/factures/{echue['id']}").json()
     actions = [h["action"] for h in detail["historique"]]
     assert actions[0] == "creation_facture" and "declaration_litige" in actions and "levee_litige" in actions
+
+
+def test_file_aujourdhui_et_explications(client):
+    for type_, nom in [("clients", "clients.csv"), ("factures", "factures_lot1.csv"),
+                       ("paiements", "paiements_mobile_money.csv")]:
+        assert _envoyer(client, type_, nom).status_code == 201
+    r = client.get("/api/aujourdhui").json()
+    assert r["date_reference"] == "2026-12-15" and r["resume"]["a_relancer"] == len(r["file"]) > 0
+    premiere = r["file"][0]
+    assert premiere["rang"] == 1 and premiere["explication"].startswith("Priorité 1 :")
+
+    filtre = client.get("/api/aujourdhui?tranche=1-15&montant_max=200000").json()
+    assert filtre["file"] and all(p["facture"]["tranche"] == "1-15" for p in filtre["file"])
+    assert client.get("/api/aujourdhui?montant_min=abc").status_code == 422
+
+    pourquoi = client.get(f"/api/factures/{premiere['facture']['id']}/priorite").json()
+    assert pourquoi["dans_la_file"] and pourquoi["detail"]
+    exclue = r["exclues"][0]
+    pourquoi = client.get(f"/api/factures/{exclue['facture']['id']}/priorite").json()
+    assert pourquoi["dans_la_file"] is False and pourquoi["motif"]
+
+    sim = client.post("/api/priorisation/simulation", json={"anciennete": "1", "solde": "0", "historique": "0"})
+    assert sim.status_code == 200 and {"rang", "ancien_rang"} <= sim.json()[0].keys()
+    invalide = {"anciennete": "0.9", "solde": "0.9", "historique": "0"}
+    assert client.post("/api/priorisation/simulation", json=invalide).status_code == 422
+    assert client.put("/api/parametres/poids_priorite", json=invalide,
+                      headers={"X-Utilisateur": "validateur"}).status_code == 422
+    nouveaux = {"anciennete": "0.4", "solde": "0.4", "historique": "0.2"}
+    assert client.put("/api/parametres/poids_priorite", json=nouveaux).status_code == 403  # gestionnaire
+    assert client.put("/api/parametres/poids_priorite", json=nouveaux,
+                      headers={"X-Utilisateur": "validateur"}).status_code == 200
+    assert client.get("/api/aujourdhui").json()["file"][0]["poids"]["solde"] == "0.4"

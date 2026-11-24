@@ -196,6 +196,52 @@ transition, incrémente la version de la facture et journalise l'ancien et le no
 
 ## 10. Priorisation
 
-Hiérarchie (détail en phase 3) : litiges exclus → gros montants vers l'humain → score décroissant →
-numéro de facture (départage stable). Score = somme pondérée de l'ancienneté, du solde et de
-l'historique de retard (poids : 0,5 / 0,3 / 0,2). Aucune prédiction de non-paiement.
+Une hiérarchie de règles documentée, **pas une prédiction** de non-paiement.
+
+### Score (0 à 100)
+
+```
+A = min(jours de retard / 120, 1)                                    ancienneté
+S = min(solde / seuil gros montant de la devise, 1)                   solde
+H = factures du client réglées en retard / factures du client réglées historique (0 sans historique)
+score = 100 × (0,5 × A + 0,3 × S + 0,2 × H)        arrondi au centième, demi-supérieur
+```
+
+Poids et plafond dans les paramètres (`poids_priorite`, `plafond_anciennete_jours`) ; seuls des poids
+positifs de somme 1 sont acceptés ; leur modification est réservée au validateur et journalisée.
+L'historique ne contient que des faits chiffrés (jamais d'étiquette « mauvais payeur ») : factures réglées,
+réglées en retard, retard moyen de règlement, factures échues ouvertes, dernière relance, promesse en cours.
+
+### Ordre de la file « Aujourd'hui »
+
+1. Gros montants d'abord (ils partent en validation humaine) ;
+2. score décroissant ;
+3. retard décroissant ;
+4. solde décroissant ;
+5. numéro de facture croissant (départage stable : même entrée, même ordre).
+
+### Exclusions (chacune avec son motif, consultable)
+
+| Code | Cause |
+|---|---|
+| `PAYEE`, `CLOTUREE` | rien à recouvrer |
+| `EN_LITIGE`, `SUSPENDUE` | traitement humain uniquement |
+| `NON_ECHUE` | échéance non dépassée |
+| `A_VERIFIER` | anomalie d'import en attente de décision |
+| `PROMESSE_EN_COURS` | promesse de paiement confirmée non échue |
+| `RELANCE_RECENTE` | cette facture a été relancée il y a moins de 7 jours |
+| `ETAPE_DEJA_FAITE` | l'étape atteinte a déjà été envoyée : attendre la suivante |
+
+### Étape proposée
+
+L'étape la plus avancée atteinte par le retard (R1 dès 1 j, R2 dès 10 j, R3 dès 30 j, R4 dès 45 j, R5 dès 90 j).
+Les étapes intermédiaires manquées ne sont pas rattrapées (pas de R1 puis R2 la même semaine).
+
+### Validation humaine signalée
+
+Gros montant, client sensible, client sans contact, étape R3 à R5.
+
+### Explication
+
+Phrase par gabarit, sans IA : « Priorité 3 : 45 jours de retard, solde de 320 000 FCFA, 2 retards sur
+3 factures réglées », et détail du calcul facteur par facteur.

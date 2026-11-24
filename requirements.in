@@ -1,0 +1,10 @@
+# Dépendances directes. Les versions exactes figées sont dans requirements.txt
+fastapi
+uvicorn
+pydantic
+pandas
+openpyxl
+httpx
+pytest
+pytest-cov
+hypothesis

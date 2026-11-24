@@ -1,0 +1,5 @@
+* text=auto eol=lf
+*.bat text eol=crlf
+
+# Données de démo : octets exacts (encodages et fins de ligne volontaires, empreintes d'import stables)
+data/demo/** -text

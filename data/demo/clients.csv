@@ -1,0 +1,19 @@
+﻿code_client;nom;telephone;email;canal_prefere;langue;sensible;notes
+C001;Boulangerie Les Délices;+229 0190000001;contact@delices.example;whatsapp;fr;non;bon_payeur
+C002;Pharmacie du Plateau;+229 0190000002;compta@pharmaplateau.example;email;fr;non;bon_payeur
+C003;Quincaillerie Moderne;+229 0190000003;;sms;fr;non;retardataire
+C004;Maquis Chez Awa;+229 0190000004;;whatsapp;fr;non;retardataire
+C005;Transports Adjovi;+229 0190000005;gestion@transadjovi.example;sms;fr;non;normal
+C006;École Les Petits Génies;+229 0190000006;direction@petitsgenies.example;email;fr;oui;sensible
+C007;Clinique Saint-Luc;+229 0190000007;admin@clinique-stluc.example;email;fr;oui;sensible
+C008;Garage Auto Plus;+229 0190000008;;whatsapp;fr;non;normal
+C009;Imprimerie Rapide;;;sms;fr;non;sans_contact
+C010;Supermarché Bon Prix;+229 0190000010;achats@bonprix.example;email;fr;non;gros_client
+C011;Cabinet Houngbo Conseil;+229 0190000011;cabinet@houngbo.example;email;fr;non;normal
+C012;Salon Beauté Divine;+229 0190000012;;whatsapp;fr;non;normal
+C013;Ferme Avicole du Nord;+229 0190000013;;sms;fr;non;retardataire
+C014;Librairie Savoir;+229 0190000014;librairie@savoir.example;email;fr;non;bon_payeur
+C015;Hôtel Lagune de Cotonou;+229 0190000015;reception@hotel-lagune.example;email;fr;non;normal
+C005;Transports Adjovi;+229 0190000005;gestion@transadjovi.example;sms;fr;non;normal
+;Boutique Sans Code;+229 0190000020;;sms;fr;non;
+C016;Boutique Étoile;+229 0190000016;;fax;fr;non;

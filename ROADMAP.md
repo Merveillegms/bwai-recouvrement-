@@ -1,0 +1,216 @@
+# Roadmap — Hackathon BWAI · Projet 1 : Recouvrement des factures impayées
+
+> **Pitch** : un assistant de recouvrement qui envoie la bonne relance au bon moment, ne relance jamais une facture déjà payée, ne fait jamais deux fois la même action, et explique chacune de ses décisions.
+
+## Règles non négociables
+
+- **Calculs déterministes** : soldes, retards et arrondis sont faits par du code, jamais par l'IA. Montants en `Decimal` ou en entiers FCFA, jamais en `float`.
+- **Humain dans la boucle** : litiges, gros montants et cas incertains sont validés par une personne.
+- **Idempotence** : clé unique en base (contrainte `UNIQUE`) ; aucune action n'est exécutée deux fois.
+- **Traçabilité** : journal en ajout seul, chaîné par empreintes.
+- **Local** : données réinitialisables, reprise après interruption, fonctionne sans réseau et sans IA.
+
+## Barème (sur 100)
+
+| Critère | Points | Ce qui le porte |
+|---|---|---|
+| Faisabilité métier | 25 | Règles métier écrites, jeu de données piégé, mesure des gains |
+| Qualité technique | 20 | Moteur pur et testé, couverture, architecture claire |
+| Utilité et parcours | 15 | File « Aujourd'hui », validation, historique |
+| Automatisation et IA | 15 | Séquence de relances, IA encadrée et évaluée |
+| Sécurité et maîtrise | 15 | Garde-fous, idempotence, reprise, rôles, journal |
+| Usage et présentation | 10 | README, vidéo, démo fluide |
+
+## Stack
+
+| Couche | Choix |
+|---|---|
+| Cœur / API | Python 3.10+ · FastAPI · SQLite |
+| Données | pandas (import) · `Decimal` |
+| Tests | pytest (+ hypothesis pour les tests par propriétés) |
+| Interface | Next.js · TypeScript · Tailwind (client typé généré depuis l'OpenAPI) |
+| IA (bonus) | derrière une interface remplaçable, désactivable |
+| Commandes | `python tasks.py init / demo / test / reset` |
+
+**Ordre de construction : le back d'abord, le front ensuite.** Le front ne calcule rien ; il consomme l'API. Le contrat d'API (schémas Pydantic) est figé à la fin de la phase 5, puis le front démarre.
+
+---
+
+## Partie A — Back-end
+
+### Phase 0 · Préparation ✅ (24/11)
+- [x] Dépôt Git, licence MIT, `.gitignore`, `.gitattributes`
+- [x] Environnement virtuel, dépendances à versions figées (`requirements.in` → `requirements.txt`)
+- [x] Commandes `init` / `demo` / `test` / `reset` (`tasks.py`)
+- [x] Schéma SQLite + migrations versionnées avec empreinte (`app/migrations/`)
+- [x] pytest configuré : 39 tests verts (schéma, journal chaîné, références, générateur)
+- [x] Générateur de données à graine fixe (138 lignes de factures, 35 paiements, 18 clients) + `attendus.json` ligne par ligne :
+  - [x] à échoir, échéance le jour même, échues aux bornes de tranches (1, 7, 15, 16, 30, 31, 60, 61, 90, 91, 120 j)
+  - [x] payées totalement / partiellement / en deux fois / trop-perçu
+  - [x] doublons exacts, conflits de numéro, quasi-doublons, ré-import via un 2ᵉ fichier
+  - [x] 13 lignes invalides (champ manquant, date impossible, montant négatif/nul/non numérique, décimales XOF, devise inconnue)
+  - [x] montants extrêmes (500 FCFA, 15 M FCFA) et montant aberrant
+  - [x] clients : bon payeur, retardataire, sensible, sans contact, inconnu
+  - [x] litiges déclarés, dont un partiellement payé
+  - [x] paiements : référence correcte, saisie libre, mal saisie, inconnue, absente, ambiguë, en double
+  - [x] dates : jour férié, fin de mois, fin février, changement d'année, échéance avant émission
+  - [x] formats : dates JJ/MM/AAAA, montants « 1 250 000 », espaces parasites, EUR « 1250,50 », lot 2 en Windows-1252 avec virgule et autres noms de colonnes
+- [x] Règles métier écrites dans [docs/regles_metier.md](docs/regles_metier.md)
+- [x] Journal de bord de l'équipe : [docs/journal_equipe.md](docs/journal_equipe.md)
+- [ ] Interroger un gestionnaire / mentor et valider les points **[à valider]** des règles métier
+- [ ] Mesurer la référence manuelle (temps pour 50 factures, erreurs)
+
+**Sortie** : `init` + `test` passent sur une machine neuve ; le jeu de données est généré. ✅ (à refaire sur le poste d'un coéquipier)
+
+### Phase 1 · Import et validation
+- [ ] Import CSV / XLSX (factures, clients, paiements), détection encodage et séparateur
+- [ ] Correspondance de colonnes aux noms variables
+- [ ] Empreinte du fichier : refus d'un fichier déjà importé
+- [ ] Import transactionnel (tout ou rien)
+- [ ] Contrôles : champs obligatoires, formats, échéance ≥ émission, devise autorisée, client connu, montant aberrant
+- [ ] Doublons : exact, quasi-doublon, doublon inter-fichiers ; résolution journalisée
+- [ ] Rapport d'import : lues / acceptées / rejetées / avertissements + fichier des rejets avec motif
+
+**Sortie** : chaque anomalie du jeu piégé est détectée, prouvée par un test.
+
+### Phase 2 · Moteur de calcul (fonctions pures)
+- [ ] Solde = TTC − paiements rapprochés − avoirs ; trop-perçu et paiement partiel
+- [ ] Une seule fonction d'arrondi
+- [ ] Retard calculé à une « date du jour » injectable ; jours ouvrés / fériés en option
+- [ ] Tranches : non échue, 1-15, 16-30, 31-60, 61-90, > 90
+- [ ] Statuts : à échoir, échue, partiellement payée, payée, en litige, suspendue, clôturée
+- [ ] Table de transitions autorisées ; chaque transition est journalisée
+- [ ] Rapprochement : référence exacte → montant + client → proposition à valider ; doublons et références inconnues détectés ; aucun rapprochement ambigu appliqué seul
+- [ ] Tests unitaires, tests par propriétés, non-régression sur le jeu figé
+
+**Sortie** : 100 % des cas donnent le bon statut et le bon retard ; couverture du moteur > 90 %.
+
+### Phase 3 · Priorisation
+- [ ] Score = somme pondérée (ancienneté, solde, historique de retard) ; poids dans `parametres`
+- [ ] Hiérarchie documentée : litige exclu → gros montant vers l'humain → ancienneté ↓ → solde ↓
+- [ ] Départage stable (numéro de facture)
+- [ ] Historique client chiffré, sans étiquette « mauvais payeur »
+- [ ] Explication par gabarit : « Priorité 3 : 45 jours de retard, solde 320 000 FCFA, 2 retards précédents »
+- [ ] Endpoint file « Aujourd'hui » avec filtres et exclusions (payée, litige, suspendue, relance récente)
+
+**Sortie** : ordre identique au calcul manuel ; chaque rang a son explication.
+
+### Phase 4 · Relances
+- [ ] Séquence réglable : R0 (−3 j) · R1 (+1-3 j) · R2 (+10-15 j) · R3 (+30 j, humain) · R4 (+45-60 j, humain) · R5 (+90 j, escalade)
+- [ ] Délai minimal entre deux relances ; une relance max par client et par jour (factures regroupées)
+- [ ] Gabarits par étape et canal (SMS, WhatsApp, e-mail) ; variables insérées par le code
+- [ ] Référence de paiement unique avec clé de contrôle ; fiche de paiement PDF
+- [ ] Connecteur bac à sable (table `messages_sortants`) derrière une interface d'envoi unique
+- [ ] Saisie des réponses : promesse (suspend jusqu'à la date), paiement annoncé, litige, injoignable
+
+**Sortie** : chaque facture éligible génère le bon message, à la bonne étape, une seule fois.
+
+### Phase 5 · Garde-fous
+- [ ] Revalidation juste avant envoi (version de la facture) ; annulation journalisée si l'état a changé
+- [ ] Vérification que le message ne contient que les valeurs calculées
+- [ ] File de validation humaine : litige, gros montant, R3-R5, client sensible, donnée incertaine, message IA
+- [ ] Actions : approuver / modifier / suspendre / rejeter (motif obligatoire) ; message modifié revérifié
+- [ ] Idempotence : clé = facture + étape + canal + période, `UNIQUE` en base, même transaction
+- [ ] Verrou contre deux traitements concurrents
+- [ ] États : brouillon → à valider → validée → en cours d'envoi → envoyée / échec / annulée
+- [ ] Reprise au démarrage des relances « en cours d'envoi » (vérification de l'accusé simulé)
+- [ ] Test qui tue le processus à chaque étape et vérifie l'absence de doublon
+- [ ] Rôles : gestionnaire, validateur, auditeur (comptes de test) ; masquage des téléphones
+- [ ] Arrêt d'urgence global journalisé
+
+**Sortie** : « je tue le programme en pleine file, je relance, aucun doublon » réussit à chaque essai.
+**→ Contrat d'API figé, le front peut démarrer.**
+
+### Phase 6 · Journal, audit, indicateurs (API)
+- [ ] Journal : horodatage, acteur (humain / système / IA), action, objet, avant, après, règle
+- [ ] Trigger SQL qui refuse `UPDATE` / `DELETE` ; chaînage par empreintes + endpoint de vérification
+- [ ] Recherche et export CSV du journal
+- [ ] Historique par facture + « pourquoi cette facture est-elle ici ? »
+- [ ] Indicateurs : total à recouvrer, tranches, top 10, charge de validation, recouvré après relance, délai moyen, promesses tenues, anomalies évitées
+- [ ] Horloge simulée (avancer de N jours), scénario de démo, `reset`
+
+**Sortie** : à partir du seul journal, on explique chaque relance envoyée, bloquée ou annulée.
+
+### Phase 7 · IA encadrée (bonus, désactivable)
+- [ ] Rédaction : reçoit des champs calculés + gabarit ; valeurs sensibles injectées après génération via marqueurs ; repli sur gabarit fixe
+- [ ] Vérificateur : extraction des montants / dates / références et comparaison exacte ; mots interdits, longueur
+- [ ] Classification des réponses (promesse, paiement, litige, délai, info, sans rapport) avec seuil de confiance ; ne change jamais seule un statut sensible
+- [ ] Évaluation sur 30-50 exemples étiquetés : exactitude, rappel sur litiges, taux de blocage
+- [ ] Protection contre l'injection, minimisation des données, journal entrées/sorties, interrupteur global
+
+**Sortie** : 0 message envoyé avec une valeur différente des données calculées.
+
+---
+
+## Partie B — Front-end (après la phase 5)
+
+> Identité distinctive mais sobre, sans landing page. Je te proposerai 2 ou 3 pistes visuelles à choisir avant de coder.
+
+- [ ] Client d'API typé généré depuis l'OpenAPI
+- [ ] Pages : import (+ correspondance de colonnes, rapport), file « Aujourd'hui », file de validation, fiche facture avec frise, journal, tableau de bord, paramètres
+- [ ] Boutons désactivés pendant l'appel + clé d'idempotence envoyée à chaque action
+- [ ] Rôles visibles (gestionnaire / validateur / auditeur)
+- [ ] Contrôle de l'horloge simulée pour la démo
+- [ ] `demo` lance API + front ensemble
+
+---
+
+## Partie C — Tests, mesures, livrables
+
+### Tests et robustesse
+- [ ] Pyramide : unitaires · intégration · bout en bout · robustesse (interruption, double clic, concurrence, fichier corrompu) · sécurité · IA
+- [ ] Rapport de couverture dans le dépôt
+- [ ] 10 000 factures : temps d'import et de calcul mesurés
+- [ ] Sauvegarde / restauration en une commande
+- [ ] Aucun secret dans le dépôt ; licences des dépendances déclarées
+
+### Mesure des gains
+- [ ] Protocole : 50 factures traitées à la main puis avec l'outil, chronométrées
+- [ ] Erreurs comptées : facture payée relancée, doublon, mauvaise priorité, mauvais montant, relance oubliée
+- [ ] Tableau « manuel / outil » + coût de fonctionnement
+
+### Livrables
+- [ ] **Prototype** : `init` + `demo`, `reset`, reprise démontrée, testé sur une autre machine
+- [ ] **Code source** : dépôt accessible, tag de rendu, licences
+- [ ] **README** : présentation, installation, lancement, comptes de test, scénario de démo, tests, limites
+- [ ] **Rapport (3-5 pages)** : besoin, architecture, règles métier, garde-fous, tests et gains, limites et coûts
+- [ ] **Fiche IA** : modèle, données envoyées, évaluation, seuils de revue, mode sans IA
+- [ ] **Vidéo (2-3 min)** : problème → import et anomalies → priorisation → relance et validation humaine → coupure / reprise → chiffres et journal
+
+---
+
+## Priorités si le temps manque
+
+1. Calculs et statuts exacts, import sans erreur
+2. Priorisation expliquée, séquence de relances
+3. Validation humaine, revalidation, idempotence, reprise
+4. Journal d'audit et tests
+5. Mesure des gains et tableau de bord
+6. Livrables
+7. IA de rédaction et classification
+8. Bonus
+
+## Checklist finale
+
+- [ ] `init` + `test` + `demo` passent sur une machine neuve
+- [ ] Le jeu piégé donne tous les résultats attendus
+- [ ] Aucune facture payée relancée dans la démo
+- [ ] Coupure / reprise réussie trois fois de suite
+- [ ] Le journal explique chaque décision
+- [ ] Le mode sans IA fonctionne
+- [ ] Aucun secret, licences déclarées
+- [ ] README, rapport, fiche IA, vidéo livrés
+- [ ] Tag de version posé
+
+## Décisions prises
+
+| Sujet | Décision |
+|---|---|
+| Ordre | Back complet (phases 0 à 6) avant le front ; le contrat d'API est figé en fin de phase 5 |
+| Interface | Identité visuelle distinctive mais sobre : pas de template générique, pas de landing page, micro-animations utiles seulement ; on arrive directement sur la file « Aujourd'hui » |
+| Commandes | `python tasks.py init / demo / test / reset` (pas de `make`) |
+| Gros montant | 1 000 000 FCFA (réglable dans `parametres`) |
+
+## Questions ouvertes
+
+- Fournisseur d'IA pour le bonus (API distante ou modèle local) : à trancher en phase 7

@@ -1,0 +1,29 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.hypothesis/
+.coverage
+htmlcov/
+
+# Base locale (recréée par python tasks.py init / reset)
+data/*.db
+data/*.db-wal
+data/*.db-shm
+data/sauvegardes/
+
+# Secrets
+.env
+.env.*
+
+# Frontend
+node_modules/
+frontend/.next/
+frontend/out/
+
+# Éditeurs / OS
+.vscode/
+.idea/
+Thumbs.db
+.DS_Store

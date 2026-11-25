@@ -65,6 +65,7 @@ tué à trois instants, puis relancé.
 
 | Document | Contenu |
 |---|---|
+| [docs/guide_equipe.md](docs/guide_equipe.md) | installer et tester sur une nouvelle machine, problèmes fréquents |
 | [docs/rapport.md](docs/rapport.md) | rapport : besoin, architecture, règles, garde-fous, tests, résultats, limites, coûts |
 | [docs/fiche_ia.md](docs/fiche_ia.md) | modèles, données envoyées, évaluation, erreurs, seuils de revue humaine |
 | [docs/regles_metier.md](docs/regles_metier.md) | toutes les règles métier, codes d'anomalie, transitions de statut |

@@ -56,11 +56,14 @@ async function appel(chemin: string, options: Options = {}): Promise<Response> {
   try {
     reponse = await fetch(chemin, { method: methode, headers: entetes, body: corps });
   } catch {
-    throw new ErreurApi("RESEAU", "Le serveur local ne répond pas. Vérifiez que « python tasks.py demo » tourne.", 0);
+    throw new ErreurApi("RESEAU", "Le serveur ne répond pas. En local, vérifiez que « python tasks.py demo » tourne ; en ligne, réessayez dans une minute.", 0);
   }
   if (reponse.status === 401 && !chemin.startsWith("/api/auth/connexion")) {
     fermerSession();
     if (typeof window !== "undefined") window.location.assign("/connexion");
+  }
+  if ([502, 503, 504].includes(reponse.status)) {
+    throw new ErreurApi("SERVEUR_EN_VEILLE", "Le serveur de démonstration se réveille (environ une minute). Réessayez dans un instant.", reponse.status);
   }
   if (!reponse.ok) {
     let code = "ERREUR", message = `Erreur ${reponse.status}`;

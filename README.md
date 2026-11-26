@@ -31,6 +31,12 @@ python tasks.py demo     # interface http://127.0.0.1:3000 et API http://127.0.0
 | `python tasks.py couverture` | tests et rapport de couverture (`docs/couverture.txt`) |
 | `python tasks.py mesurer` | gains face à une référence, charge de 10 000 factures, évaluation de l'IA, licences |
 
+## Version en ligne (facultatif)
+
+API sur Render, interface sur Vercel, déployées depuis ce dépôt : marche à suivre dans
+[docs/deploiement.md](docs/deploiement.md). La version en ligne n'a pas de clé d'IA : la rédaction par Gemini se
+montre en local.
+
 ## Configuration de l'IA (facultatif)
 
 Copier `.env.exemple` en `.env` et renseigner une clé Google AI Studio (`GEMINI_API_KEY`) ou Hugging Face

@@ -1,0 +1,21 @@
+# Déploiement de l'API Recouvra sur Render (offre gratuite). Voir docs/deploiement.md.
+# L'interface est déployée séparément sur Vercel et relaie /api vers ce service.
+services:
+  - type: web
+    name: recouvra-api
+    runtime: python
+    plan: free
+    region: frankfurt
+    buildCommand: pip install -r requirements.txt
+    # Migrations, comptes de démonstration et jeu de test, puis démarrage de l'API.
+    startCommand: python -m app.cli init && uvicorn app.api:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/sante
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.10.14
+      - key: PYTHONUTF8
+        value: "1"
+      # Version publique : pas de clé d'IA (les comptes de démonstration sont publics).
+      - key: RECOUVREMENT_IA_FOURNISSEUR
+        value: aucun

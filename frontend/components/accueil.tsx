@@ -152,9 +152,29 @@ function MessageIA() {
   );
 }
 
+/** Réveille l'API dès l'arrivée sur la page (hébergement gratuit mis en veille) et indique son état. */
+function useServeur() {
+  const [etat, setEtat] = useState<"inconnu" | "reveil" | "pret">("inconnu");
+  useEffect(() => {
+    let actif = true;
+    const lent = setTimeout(() => actif && setEtat((e) => (e === "pret" ? e : "reveil")), 1500);
+    const essayer = async (reste: number) => {
+      try {
+        const r = await fetch("/api/sante", { cache: "no-store" });
+        if (r.ok) { if (actif) setEtat("pret"); return; }
+      } catch { /* serveur encore endormi */ }
+      if (actif && reste > 0) setTimeout(() => essayer(reste - 1), 5000);
+    };
+    essayer(24);
+    return () => { actif = false; clearTimeout(lent); };
+  }, []);
+  return etat;
+}
+
 export function Accueil() {
   const [connecte, setConnecte] = useState(false);
   useEffect(() => setConnecte(!!session()), []);
+  const serveur = useServeur();
   const cible = connecte ? "/app" : "/connexion";
   const bande = { paddingLeft: "max(20px, env(safe-area-inset-left, 0px))", paddingRight: "max(20px, env(safe-area-inset-right, 0px))" };
 
@@ -170,7 +190,13 @@ export function Accueil() {
             <a href="#garde-fous" className="hover:text-encre">Garde-fous</a>
             <a href="#ia" className="hover:text-encre">IA encadrée</a>
           </nav>
-          <Link href={cible} className="btn ml-auto">{connecte ? "Ouvrir l'application" : "Se connecter"}</Link>
+          {serveur !== "inconnu" && (
+            <span className="ml-auto hidden items-center gap-2 text-[13px] text-doux sm:flex" role="status">
+              <span className={`h-2 w-2 rounded-full ${serveur === "pret" ? "bg-vert" : "animate-pulse bg-doux"}`} />
+              {serveur === "pret" ? "Serveur prêt" : "Réveil du serveur…"}
+            </span>
+          )}
+          <Link href={cible} className={`btn ${serveur === "inconnu" ? "ml-auto" : "sm:ml-0 ml-auto"}`}>{connecte ? "Ouvrir l'application" : "Se connecter"}</Link>
         </div>
       </header>
 

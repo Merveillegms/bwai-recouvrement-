@@ -26,7 +26,7 @@
 | Couche | Choix |
 |---|---|
 | Cœur / API | Python 3.10+ · FastAPI · SQLite |
-| Données | pandas (import) · `Decimal` |
+| Données | module `csv` et openpyxl (import) · `Decimal` |
 | Tests | pytest (+ hypothesis pour les tests par propriétés) |
 | Interface | Next.js · TypeScript · Tailwind (client typé généré depuis l'OpenAPI) |
 | IA (bonus) | derrière une interface remplaçable, désactivable |
